@@ -7,17 +7,11 @@ import plotly.graph_objects as go
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.preprocessing import StandardScaler
 import json
-import uuid
-import sqlite3
 import hashlib
 import requests
 import folium
 from streamlit_folium import folium_static
 import time
-import base64
-from email.mime.text import MimeText
-from email.mime.multipart import MimeMultipart
-import smtplib
 
 # Configuration de la page
 st.set_page_config(
@@ -124,125 +118,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Classe pour la gestion de la base de données
-class DatabaseManager:
-    def __init__(self, db_name="imomatch.db"):
-        self.db_name = db_name
-        self.init_database()
-    
-    def init_database(self):
-        """Initialiser la base de données avec toutes les tables"""
-        conn = sqlite3.connect(self.db_name)
-        cursor = conn.cursor()
-        
-        # Table des utilisateurs
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS users (
-                id TEXT PRIMARY KEY,
-                email TEXT UNIQUE NOT NULL,
-                password_hash TEXT NOT NULL,
-                user_type TEXT NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                is_premium BOOLEAN DEFAULT FALSE,
-                subscription_end DATE
-            )
-        ''')
-        
-        # Table des profils
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS profiles (
-                id TEXT PRIMARY KEY,
-                user_id TEXT,
-                profile_data TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users (id)
-            )
-        ''')
-        
-        # Table des propriétés
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS properties (
-                id TEXT PRIMARY KEY,
-                owner_id TEXT,
-                property_data TEXT,
-                status TEXT DEFAULT 'active',
-                views INTEGER DEFAULT 0,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (owner_id) REFERENCES users (id)
-            )
-        ''')
-        
-        # Table des matches/recommandations
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS matches (
-                id TEXT PRIMARY KEY,
-                user_id TEXT,
-                property_id TEXT,
-                score REAL,
-                status TEXT DEFAULT 'pending',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users (id),
-                FOREIGN KEY (property_id) REFERENCES properties (id)
-            )
-        ''')
-        
-        # Table des notifications
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS notifications (
-                id TEXT PRIMARY KEY,
-                user_id TEXT,
-                title TEXT,
-                message TEXT,
-                type TEXT,
-                is_read BOOLEAN DEFAULT FALSE,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users (id)
-            )
-        ''')
-        
-        # Table des messages (chat IA)
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS ai_messages (
-                id TEXT PRIMARY KEY,
-                user_id TEXT,
-                message TEXT,
-                role TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users (id)
-            )
-        ''')
-        
-        conn.commit()
-        conn.close()
-    
-    def execute_query(self, query, params=None):
-        """Exécuter une requête SQL"""
-        conn = sqlite3.connect(self.db_name)
-        cursor = conn.cursor()
-        if params:
-            cursor.execute(query, params)
-        else:
-            cursor.execute(query)
-        result = cursor.fetchall()
-        conn.commit()
-        conn.close()
-        return result
-    
-    def insert_user(self, user_data):
-        """Insérer un nouvel utilisateur"""
-        query = """
-        INSERT INTO users (id, email, password_hash, user_type) 
-        VALUES (?, ?, ?, ?)
-        """
-        self.execute_query(query, (
-            user_data['id'], 
-            user_data['email'], 
-            user_data['password_hash'], 
-            user_data['user_type']
-        ))
-
-# Classe pour l'authentification
+# Classe pour l'authentification (version simplifiée sans DB)
 class AuthManager:
     @staticmethod
     def hash_password(password):
@@ -253,42 +129,12 @@ class AuthManager:
     def verify_password(password, hashed):
         """Vérifier un mot de passe"""
         return AuthManager.hash_password(password) == hashed
-    
-    @staticmethod
-    def create_user(db, email, password, user_type):
-        """Créer un nouvel utilisateur"""
-        user_id = str(uuid.uuid4())
-        password_hash = AuthManager.hash_password(password)
-        
-        user_data = {
-            'id': user_id,
-            'email': email,
-            'password_hash': password_hash,
-            'user_type': user_type
-        }
-        
-        try:
-            db.insert_user(user_data)
-            return user_id
-        except sqlite3.IntegrityError:
-            return None
-    
-    @staticmethod
-    def authenticate_user(db, email, password):
-        """Authentifier un utilisateur"""
-        query = "SELECT id, password_hash, user_type FROM users WHERE email = ?"
-        result = db.execute_query(query, (email,))
-        
-        if result and AuthManager.verify_password(password, result[0][1]):
-            return {'id': result[0][0], 'user_type': result[0][2]}
-        return None
 
 # Classe pour les services géographiques
 class GeoService:
     @staticmethod
     def get_coordinates(address):
-        """Obtenir les coordonnées d'une adresse (simulation)"""
-        # En production, utiliser une vraie API comme Google Maps ou Nominatim
+        """Obtenir les coordonnées d'une adresse"""
         coordinates_db = {
             "paris": {"lat": 48.8566, "lon": 2.3522},
             "lyon": {"lat": 45.7640, "lon": 4.8357},
@@ -304,13 +150,11 @@ class GeoService:
     @staticmethod
     def create_map(properties):
         """Créer une carte avec les propriétés"""
-        # Centre de la carte sur Paris par défaut
         m = folium.Map(location=[48.8566, 2.3522], zoom_start=6)
         
         for prop in properties:
             coords = GeoService.get_coordinates(prop.get('ville', 'Paris'))
             
-            # Couleur selon le type de bien
             color_map = {
                 'Appartement': 'blue',
                 'Maison': 'green',
@@ -350,11 +194,12 @@ class AIService:
         # Surface compatibility (25 points)
         surface_souhaitee = profile.get('surface_souhaitee', 70)
         surface = property_data.get('surface', 0)
-        surface_diff = abs(surface - surface_souhaitee) / surface_souhaitee
-        if surface_diff <= 0.3:
-            surface_score = 25 * (1 - surface_diff)
-            score += surface_score
-            factors.append(f"Surface: {surface_score:.1f}/25")
+        if surface_souhaitee > 0:
+            surface_diff = abs(surface - surface_souhaitee) / surface_souhaitee
+            if surface_diff <= 0.3:
+                surface_score = 25 * (1 - surface_diff)
+                score += surface_score
+                factors.append(f"Surface: {surface_score:.1f}/25")
         
         # Location preference (25 points)
         villes_souhaitees = [v.lower() for v in profile.get('villes_souhaitees', [])]
@@ -408,53 +253,73 @@ class AIService:
         
         return np.random.choice(responses[category])
 
-# Classe pour les notifications
-class NotificationManager:
-    def __init__(self, db):
-        self.db = db
-    
-    def create_notification(self, user_id, title, message, notification_type="info"):
-        """Créer une nouvelle notification"""
-        notification_id = str(uuid.uuid4())
-        query = """
-        INSERT INTO notifications (id, user_id, title, message, type) 
-        VALUES (?, ?, ?, ?, ?)
-        """
-        self.db.execute_query(query, (notification_id, user_id, title, message, notification_type))
-    
-    def get_user_notifications(self, user_id, limit=10):
-        """Récupérer les notifications d'un utilisateur"""
-        query = """
-        SELECT title, message, type, is_read, created_at 
-        FROM notifications 
-        WHERE user_id = ? 
-        ORDER BY created_at DESC 
-        LIMIT ?
-        """
-        return self.db.execute_query(query, (user_id, limit))
-    
-    def mark_as_read(self, user_id):
-        """Marquer toutes les notifications comme lues"""
-        query = "UPDATE notifications SET is_read = TRUE WHERE user_id = ?"
-        self.db.execute_query(query, (user_id,))
-
 # Initialisation des services
 @st.cache_resource
 def init_services():
-    db = DatabaseManager()
     auth = AuthManager()
     geo = GeoService()
     ai = AIService()
-    return db, auth, geo, ai
+    return auth, geo, ai
 
-db, auth, geo, ai = init_services()
-notification_manager = NotificationManager(db)
+auth, geo, ai = init_services()
 
-# Initialisation du state
+# Initialisation du state avec données en mémoire
 if 'user' not in st.session_state:
     st.session_state.user = None
+if 'users_db' not in st.session_state:
+    st.session_state.users_db = {}
+if 'profiles_db' not in st.session_state:
+    st.session_state.profiles_db = {}
+if 'properties_db' not in st.session_state:
+    # Données de démonstration
+    st.session_state.properties_db = {
+        "prop_1": {
+            "id": "prop_1",
+            "titre": "Magnifique 3P - Bastille",
+            "type": "Appartement",
+            "surface": 75,
+            "pieces": 3,
+            "prix": 485000,
+            "ville": "Paris",
+            "quartier": "Bastille",
+            "description": "Appartement lumineux avec parquet ancien, 2 chambres, cuisine équipée, proche métro.",
+            "caracteristiques": ["Balcon", "Cave", "Interphone"],
+            "photos": ["https://via.placeholder.com/300x200/4287f5/ffffff?text=Photo+1"],
+            "agent": "Marie Dubois - Century 21"
+        },
+        "prop_2": {
+            "id": "prop_2",
+            "titre": "Maison familiale - Vincennes",
+            "type": "Maison",
+            "surface": 120,
+            "pieces": 5,
+            "prix": 680000,
+            "ville": "Vincennes",
+            "quartier": "Centre",
+            "description": "Belle maison avec jardin, 4 chambres, garage, dans quartier calme et résidentiel.",
+            "caracteristiques": ["Jardin", "Garage", "Cheminée"],
+            "photos": ["https://via.placeholder.com/300x200/28a745/ffffff?text=Photo+2"],
+            "agent": "Pierre Martin - Orpi"
+        },
+        "prop_3": {
+            "id": "prop_3",
+            "titre": "Loft d'artiste - République",
+            "type": "Loft",
+            "surface": 85,
+            "pieces": 2,
+            "prix": 520000,
+            "ville": "Paris",
+            "quartier": "République",
+            "description": "Ancien atelier d'artiste rénové, volumes exceptionnels, très lumineux.",
+            "caracteristiques": ["Hauteur 4m", "Verrière", "Terrasse"],
+            "photos": ["https://via.placeholder.com/300x200/fd7e14/ffffff?text=Photo+3"],
+            "agent": "Sophie Leroy - Indépendant"
+        }
+    }
 if 'notifications' not in st.session_state:
     st.session_state.notifications = []
+if 'ai_messages' not in st.session_state:
+    st.session_state.ai_messages = []
 
 # Header principal avec info utilisateur
 col1, col2, col3 = st.columns([2, 1, 1])
@@ -471,8 +336,11 @@ with col2:
     if st.session_state.user:
         st.success(f"👤 Connecté")
         if st.button("🔔 Notifications", key="notif_btn"):
-            notifications = notification_manager.get_user_notifications(st.session_state.user['id'])
-            st.session_state.notifications = notifications
+            if st.session_state.notifications:
+                for notif in st.session_state.notifications:
+                    st.info(f"📧 {notif}")
+            else:
+                st.info("Aucune nouvelle notification")
 
 with col3:
     if st.session_state.user:
@@ -494,14 +362,20 @@ with st.sidebar:
                 password = st.text_input("🔒 Mot de passe", type="password")
                 
                 if st.form_submit_button("Se connecter", use_container_width=True):
-                    user = auth.authenticate_user(db, email, password)
-                    if user:
-                        st.session_state.user = user
-                        st.success("✅ Connexion réussie !")
-                        time.sleep(1)
-                        st.rerun()
+                    if email in st.session_state.users_db:
+                        stored_hash = st.session_state.users_db[email]['password_hash']
+                        if auth.verify_password(password, stored_hash):
+                            st.session_state.user = {
+                                'email': email,
+                                'user_type': st.session_state.users_db[email]['user_type']
+                            }
+                            st.success("✅ Connexion réussie !")
+                            time.sleep(1)
+                            st.rerun()
+                        else:
+                            st.error("❌ Mot de passe incorrect")
                     else:
-                        st.error("❌ Email ou mot de passe incorrect")
+                        st.error("❌ Email non trouvé")
         
         with auth_tab2:
             with st.form("register_form"):
@@ -518,21 +392,18 @@ with st.sidebar:
                         st.error("❌ Les mots de passe ne correspondent pas")
                     elif len(reg_password) < 6:
                         st.error("❌ Le mot de passe doit contenir au moins 6 caractères")
+                    elif reg_email in st.session_state.users_db:
+                        st.error("❌ Cette adresse email est déjà utilisée")
                     else:
-                        user_id = auth.create_user(db, reg_email, reg_password, user_type)
-                        if user_id:
-                            st.success("✅ Compte créé avec succès !")
-                            # Notification de bienvenue
-                            notification_manager.create_notification(
-                                user_id,
-                                "🎉 Bienvenue sur imoMatch !",
-                                "Votre compte a été créé avec succès. Complétez votre profil pour recevoir des recommandations personnalisées.",
-                                "success"
-                            )
-                            time.sleep(1)
-                            st.rerun()
-                        else:
-                            st.error("❌ Cette adresse email est déjà utilisée")
+                        st.session_state.users_db[reg_email] = {
+                            'password_hash': auth.hash_password(reg_password),
+                            'user_type': user_type,
+                            'created_at': datetime.now().isoformat()
+                        }
+                        st.success("✅ Compte créé avec succès !")
+                        st.session_state.notifications.append("🎉 Bienvenue sur imoMatch !")
+                        time.sleep(1)
+                        st.rerun()
     
     else:
         # Navigation pour utilisateur connecté
@@ -541,16 +412,14 @@ with st.sidebar:
         # Affichage des notifications
         if st.session_state.notifications:
             st.subheader("🔔 Notifications")
-            for notif in st.session_state.notifications[:3]:
+            for i, notif in enumerate(st.session_state.notifications[:3]):
                 st.markdown(f"""
                 <div class="notification">
-                    <strong>{notif[0]}</strong><br>
-                    <small>{notif[1]}</small>
+                    <small>{notif}</small>
                 </div>
                 """, unsafe_allow_html=True)
             
             if st.button("Marquer comme lues"):
-                notification_manager.mark_as_read(st.session_state.user['id'])
                 st.session_state.notifications = []
                 st.rerun()
         
@@ -640,7 +509,7 @@ if st.session_state.user is None:
         st.plotly_chart(fig, use_container_width=True)
 
 elif page == "dashboard":
-    st.header("🏠 Dashboard")
+    st.header("🏠 Dashboard Personnel")
     
     # Métriques personnalisées
     col1, col2, col3, col4 = st.columns(4)
@@ -717,18 +586,17 @@ elif page == "profile":
                 with col1:
                     nom = st.text_input("👤 Nom complet")
                     telephone = st.text_input("📱 Téléphone")
-                    age = st.number_input("🎂 Âge", min_value=18, max_value=100)
+                    age = st.number_input("🎂 Âge", min_value=18, max_value=100, value=30)
                     profession = st.text_input("💼 Profession")
                     
                 with col2:
                     situation = st.selectbox("👨‍👩‍👧‍👦 Situation familiale", 
                                            ["Célibataire", "En couple", "Marié(e)", "Divorcé(e)"])
-                    revenus = st.number_input("💰 Revenus mensuels nets (€)", min_value=0)
-                    enfants = st.number_input("👶 Nombre d'enfants", min_value=0)
+                    revenus = st.number_input("💰 Revenus mensuels nets (€)", min_value=0, value=3000)
+                    enfants = st.number_input("👶 Nombre d'enfants", min_value=0, value=0)
                     animaux = st.checkbox("🐕 Animaux de compagnie")
                 
                 if st.form_submit_button("💾 Sauvegarder", use_container_width=True):
-                    # Sauvegarder le profil en base
                     profile_data = {
                         "nom": nom,
                         "telephone": telephone,
@@ -740,23 +608,11 @@ elif page == "profile":
                         "animaux": animaux
                     }
                     
-                    # Insertion en base de données
-                    query = """
-                    INSERT OR REPLACE INTO profiles (id, user_id, profile_data) 
-                    VALUES (?, ?, ?)
-                    """
-                    profile_id = str(uuid.uuid4())
-                    db.execute_query(query, (profile_id, st.session_state.user['id'], json.dumps(profile_data)))
+                    # Sauvegarder en mémoire
+                    st.session_state.profiles_db[st.session_state.user['email']] = profile_data
                     
                     st.success("✅ Profil mis à jour avec succès !")
-                    
-                    # Notification
-                    notification_manager.create_notification(
-                        st.session_state.user['id'],
-                        "📝 Profil mis à jour",
-                        "Vos informations ont été sauvegardées. Votre score de matching va s'améliorer !",
-                        "info"
-                    )
+                    st.session_state.notifications.append("📝 Profil mis à jour - Votre score de matching va s'améliorer !")
         
         with profile_tab2:
             with st.form("search_criteria"):
@@ -784,7 +640,7 @@ elif page == "profile":
                     arrondissements = st.text_area("📍 Arrondissements/Quartiers préférés", 
                                                  placeholder="Ex: 15e, 16e, Belleville...")
                     transport_max = st.number_input("🚇 Distance max transport (min)", min_value=1, value=15)
-                    
+                
                 st.subheader("🏠 Caractéristiques souhaitées")
                 
                 col4, col5 = st.columns(2)
@@ -801,12 +657,6 @@ elif page == "profile":
                     vue = st.selectbox("🌅 Vue", ["Peu importante", "Sur cour", "Dégagée", "Exceptionnelle"])
                     etat = st.selectbox("🔧 État du bien", ["À rénover", "Bon état", "Très bon état", "Neuf/Récent"])
                 
-                st.subheader("📍 Proximité souhaitée")
-                
-                proximites = st.multiselect("🎯 Services importants à proximité", 
-                                          ["Écoles/Crèches", "Commerces", "Parcs", "Restaurants", "Salles de sport", 
-                                           "Centres médicaux", "Transports", "Bureaux/Coworking"])
-                
                 if st.form_submit_button("🎯 Sauvegarder les critères", use_container_width=True):
                     criteria = {
                         "transaction_type": transaction_type,
@@ -816,28 +666,15 @@ elif page == "profile":
                         "pieces_min": pieces_min,
                         "pieces_max": pieces_max,
                         "type_bien": type_bien,
-                        "etage_pref": etage_pref,
                         "villes": villes,
-                        "arrondissements": arrondissements,
-                        "transport_max": transport_max,
                         "balcon": balcon,
                         "parking": parking,
-                        "ascenseur": ascenseur,
-                        "cave": cave,
-                        "luminosite": luminosite,
-                        "calme": calme,
-                        "vue": vue,
-                        "etat": etat,
-                        "proximites": proximites
+                        "ascenseur": ascenseur
                     }
                     
                     # Sauvegarde des critères
-                    query = """
-                    INSERT OR REPLACE INTO profiles (id, user_id, profile_data) 
-                    VALUES (?, ?, ?)
-                    """
-                    criteria_id = f"{st.session_state.user['id']}_criteria"
-                    db.execute_query(query, (criteria_id, st.session_state.user['id'], json.dumps(criteria)))
+                    criteria_key = f"{st.session_state.user['email']}_criteria"
+                    st.session_state.profiles_db[criteria_key] = criteria
                     
                     st.success("🎯 Critères de recherche sauvegardés !")
         
@@ -855,6 +692,7 @@ elif page == "profile":
                     
                     if st.form_submit_button("Changer le mot de passe"):
                         if new_password == confirm_password and len(new_password) >= 6:
+                            st.session_state.users_db[st.session_state.user['email']]['password_hash'] = auth.hash_password(new_password)
                             st.success("✅ Mot de passe mis à jour !")
                         else:
                             st.error("❌ Erreur dans la modification du mot de passe")
@@ -886,142 +724,93 @@ elif page == "recommendations":
             st.rerun()
     
     with col1:
-        # Propriétés recommandées (données simulées avec IA)
-        sample_properties = [
-            {
-                "id": "prop_1",
-                "titre": "Magnifique 3P - Bastille",
-                "type": "Appartement",
-                "surface": 75,
-                "pieces": 3,
-                "prix": 485000,
-                "ville": "Paris",
-                "quartier": "Bastille",
-                "description": "Appartement lumineux avec parquet ancien, 2 chambres, cuisine équipée, proche métro.",
-                "caracteristiques": ["Balcon", "Cave", "Interphone"],
-                "photos": ["https://via.placeholder.com/300x200/4287f5/ffffff?text=Photo+1"],
-                "agent": "Marie Dubois - Century 21"
-            },
-            {
-                "id": "prop_2",
-                "titre": "Maison familiale - Vincennes",
-                "type": "Maison",
-                "surface": 120,
-                "pieces": 5,
-                "prix": 680000,
-                "ville": "Vincennes",
-                "quartier": "Centre",
-                "description": "Belle maison avec jardin, 4 chambres, garage, dans quartier calme et résidentiel.",
-                "caracteristiques": ["Jardin", "Garage", "Cheminée"],
-                "photos": ["https://via.placeholder.com/300x200/28a745/ffffff?text=Photo+2"],
-                "agent": "Pierre Martin - Orpi"
-            },
-            {
-                "id": "prop_3",
-                "titre": "Loft d'artiste - République",
-                "type": "Loft",
-                "surface": 85,
-                "pieces": 2,
-                "prix": 520000,
-                "ville": "Paris",
-                "quartier": "République",
-                "description": "Ancien atelier d'artiste rénové, volumes exceptionnels, très lumineux.",
-                "caracteristiques": ["Hauteur 4m", "Verrière", "Terrasse"],
-                "photos": ["https://via.placeholder.com/300x200/fd7e14/ffffff?text=Photo+3"],
-                "agent": "Sophie Leroy - Indépendant"
-            }
-        ]
-        
-        # Calcul des scores de compatibilité
+        # Propriétés recommandées avec IA
         fake_profile = {
-            "budget_max": 600000,
+            "budget_max": prix_max * 1000,
             "surface_souhaitee": 80,
             "type_bien": "appartement",
             "villes_souhaitees": ["paris", "vincennes"]
         }
         
-        for prop in sample_properties:
+        properties_list = list(st.session_state.properties_db.values())
+        
+        for prop in properties_list:
             score, factors = ai.calculate_compatibility_score(fake_profile, prop)
             
-            # Carte de propriété avec design amélioré
-            st.markdown(f"""
-            <div class="property-card">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                    <h3 style="margin: 0; color: #667eea;">{prop['titre']}</h3>
-                    <div class="match-score match-{'excellent' if score >= 80 else 'good' if score >= 60 else 'average'}">
-                        {score:.0f}%
+            if score >= score_min:
+                # Carte de propriété avec design amélioré
+                st.markdown(f"""
+                <div class="property-card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <h3 style="margin: 0; color: #667eea;">{prop['titre']}</h3>
+                        <div class="match-score match-{'excellent' if score >= 80 else 'good' if score >= 60 else 'average'}">
+                            {score:.0f}%
+                        </div>
                     </div>
                 </div>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            col_info, col_photo, col_actions = st.columns([2, 1, 1])
-            
-            with col_info:
-                st.write(f"**{prop['type']} • {prop['surface']}m² • {prop['pieces']} pièces**")
-                st.write(f"📍 {prop['ville']} - {prop['quartier']}")
-                st.write(f"💰 **{prop['prix']:,}€**")
-                st.write(prop['description'])
+                """, unsafe_allow_html=True)
                 
-                # Caractéristiques
-                carac_str = " • ".join(prop['caracteristiques'])
-                st.write(f"✨ {carac_str}")
+                col_info, col_photo, col_actions = st.columns([2, 1, 1])
                 
-                st.write(f"👤 **Agent:** {prop['agent']}")
-            
-            with col_photo:
-                st.image(prop['photos'][0], use_column_width=True)
-            
-            with col_actions:
-                st.metric("🎯 Match", f"{score:.0f}%")
-                
-                if st.button(f"📧 Contacter", key=f"contact_{prop['id']}"):
-                    st.success("✅ Demande de contact envoyée !")
-                    # Notification
-                    notification_manager.create_notification(
-                        st.session_state.user['id'],
-                        "📧 Contact envoyé",
-                        f"Votre demande pour {prop['titre']} a été transmise à l'agent.",
-                        "success"
-                    )
-                
-                if st.button(f"❤️ Favoris", key=f"fav_{prop['id']}"):
-                    st.info("💖 Ajouté aux favoris !")
-                
-                if st.button(f"🔗 Partager", key=f"share_{prop['id']}"):
-                    st.info("📤 Lien copié !")
-            
-            # Détails du matching
-            with st.expander(f"🔍 Détails du matching pour {prop['titre']}"):
-                col_factors, col_chart = st.columns([1, 1])
-                
-                with col_factors:
-                    st.write("**Facteurs de compatibilité:**")
-                    for factor in factors:
-                        st.write(f"• {factor}")
-                
-                with col_chart:
-                    # Mini graphique radar du matching
-                    categories = ['Budget', 'Surface', 'Localisation', 'Type']
-                    values = [85, 92, 100, 80] if score > 80 else [70, 65, 85, 75]
+                with col_info:
+                    st.write(f"**{prop['type']} • {prop['surface']}m² • {prop['pieces']} pièces**")
+                    st.write(f"📍 {prop['ville']} - {prop['quartier']}")
+                    st.write(f"💰 **{prop['prix']:,}€**")
+                    st.write(prop['description'])
                     
-                    fig = go.Figure()
-                    fig.add_trace(go.Scatterpolar(
-                        r=values,
-                        theta=categories,
-                        fill='toself',
-                        name=f'Compatibilité'
-                    ))
-                    fig.update_layout(
-                        polar=dict(
-                            radialaxis=dict(visible=True, range=[0, 100])
-                        ),
-                        showlegend=False,
-                        height=250
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
-            
-            st.divider()
+                    # Caractéristiques
+                    carac_str = " • ".join(prop['caracteristiques'])
+                    st.write(f"✨ {carac_str}")
+                    
+                    st.write(f"👤 **Agent:** {prop['agent']}")
+                
+                with col_photo:
+                    st.image(prop['photos'][0], use_column_width=True)
+                
+                with col_actions:
+                    st.metric("🎯 Match", f"{score:.0f}%")
+                    
+                    if st.button(f"📧 Contacter", key=f"contact_{prop['id']}"):
+                        st.success("✅ Demande de contact envoyée !")
+                        st.session_state.notifications.append(f"📧 Contact envoyé pour {prop['titre']}")
+                    
+                    if st.button(f"❤️ Favoris", key=f"fav_{prop['id']}"):
+                        st.info("💖 Ajouté aux favoris !")
+                    
+                    if st.button(f"🔗 Partager", key=f"share_{prop['id']}"):
+                        st.info("📤 Lien copié !")
+                
+                # Détails du matching
+                with st.expander(f"🔍 Détails du matching pour {prop['titre']}"):
+                    col_factors, col_chart = st.columns([1, 1])
+                    
+                    with col_factors:
+                        st.write("**Facteurs de compatibilité:**")
+                        for factor in factors:
+                            st.write(f"• {factor}")
+                    
+                    with col_chart:
+                        # Mini graphique radar du matching
+                        categories = ['Budget', 'Surface', 'Localisation', 'Type']
+                        values = [85, 92, 100, 80] if score > 80 else [70, 65, 85, 75]
+                        
+                        fig = go.Figure()
+                        fig.add_trace(go.Scatterpolar(
+                            r=values,
+                            theta=categories,
+                            fill='toself',
+                            name=f'Compatibilité'
+                        ))
+                        fig.update_layout(
+                            polar=dict(
+                                radialaxis=dict(visible=True, range=[0, 100])
+                            ),
+                            showlegend=False,
+                            height=250
+                        )
+                        st.plotly_chart(fig, use_container_width=True)
+                
+                st.divider()
 
 elif page == "search":
     st.header("🔍 Recherche Avancée Multi-Critères")
@@ -1056,7 +845,8 @@ elif page == "search":
             time.sleep(2)
             
             # Simulation de résultats de recherche
-            st.success(f"✅ {np.random.randint(15, 45)} biens trouvés correspondant à vos critères !")
+            nb_results = np.random.randint(15, 45)
+            st.success(f"✅ {nb_results} biens trouvés correspondant à vos critères !")
             
             # Graphique de répartition des résultats
             col1, col2 = st.columns(2)
@@ -1078,30 +868,6 @@ elif page == "search":
                 })
                 fig = px.pie(geo_data, values='Nombre', names='Ville', title='Répartition géographique')
                 st.plotly_chart(fig, use_container_width=True)
-    
-    # Recherche sauvegardée
-    st.subheader("💾 Recherches sauvegardées")
-    
-    col1, col2, col3 = st.columns(3)
-    
-    saved_searches = [
-        {"nom": "Appartement Paris 15e", "criteres": "3P, 400-500k€", "resultats": 12},
-        {"nom": "Maison Lyon", "criteres": "4P+, jardin", "resultats": 8},
-        {"nom": "Studio étudiant", "criteres": "<300k€, transport", "resultats": 25}
-    ]
-    
-    for i, search in enumerate(saved_searches):
-        with [col1, col2, col3][i]:
-            st.markdown(f"""
-            <div class="metric-card">
-                <h4>{search['nom']}</h4>
-                <p>{search['criteres']}</p>
-                <p><strong>{search['resultats']} résultats</strong></p>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            if st.button(f"🔄 Relancer", key=f"rerun_{i}"):
-                st.info("🔍 Recherche relancée !")
 
 elif page == "map":
     st.header("🗺️ Carte Interactive des Biens")
@@ -1121,14 +887,12 @@ elif page == "map":
         show_commerces = st.checkbox("🏪 Commerces", value=False)
     
     with map_col1:
-        # Création de la carte interactive
-        sample_map_properties = [
-            {"ville": "Paris", "type": "Appartement", "prix": 450000, "surface": 65},
-            {"ville": "Paris", "type": "Loft", "prix": 580000, "surface": 85},
-            {"ville": "Lyon", "type": "Maison", "prix": 380000, "surface": 110},
-        ]
-        
-        filtered_props = [p for p in sample_map_properties if p['type'] in map_types and p['prix'] <= map_budget_max * 1000]
+        # Filtrer les propriétés selon les critères
+        filtered_props = []
+        for prop in st.session_state.properties_db.values():
+            if (prop['type'] in map_types and 
+                prop['prix'] <= map_budget_max * 1000):
+                filtered_props.append(prop)
         
         if filtered_props:
             interactive_map = geo.create_map(filtered_props)
@@ -1146,7 +910,7 @@ elif page == "map":
         with stats_col2:
             st.metric("Temps de vente moyen", "45 jours", "-12%")
         with stats_col3:
-            st.metric("Biens disponibles", "127", "+8")
+            st.metric("Biens disponibles", len(filtered_props), "+8")
 
 elif page == "ai_agent":
     st.header("🤖 Agent IA - Assistant Personnel Immobilier")
@@ -1158,7 +922,6 @@ elif page == "ai_agent":
         st.subheader("🎯 Actions rapides")
         
         if st.button("🔍 Analyser le marché", use_container_width=True):
-            st.session_state.ai_messages = st.session_state.get('ai_messages', [])
             st.session_state.ai_messages.append({
                 "role": "assistant", 
                 "content": "📊 D'après mon analyse, le marché est dynamique avec une hausse de 3.2% des prix. Je recommande de regarder les secteurs en développement comme Belleville ou République."
@@ -1166,7 +929,6 @@ elif page == "ai_agent":
             st.rerun()
         
         if st.button("💡 Conseils personnalisés", use_container_width=True):
-            st.session_state.ai_messages = st.session_state.get('ai_messages', [])
             st.session_state.ai_messages.append({
                 "role": "assistant", 
                 "content": "💡 Basé sur votre profil, je suggère d'élargir votre recherche aux villes limitrophes. Vous pourriez gagner 20% sur le prix au m² !"
@@ -1174,7 +936,6 @@ elif page == "ai_agent":
             st.rerun()
         
         if st.button("📈 Prédictions prix", use_container_width=True):
-            st.session_state.ai_messages = st.session_state.get('ai_messages', [])
             st.session_state.ai_messages.append({
                 "role": "assistant", 
                 "content": "📈 Mes modèles prédisent une stabilisation des prix dans les 6 prochains mois. C'est le moment idéal pour négocier !"
@@ -1188,7 +949,7 @@ elif page == "ai_agent":
         
     with chat_col1:
         # Historique des messages
-        if 'ai_messages' not in st.session_state:
+        if not st.session_state.ai_messages:
             st.session_state.ai_messages = [
                 {
                     "role": "assistant", 
@@ -1222,12 +983,6 @@ elif page == "ai_agent":
             ai_response = ai.generate_ai_response(user_input)
             st.session_state.ai_messages.append({"role": "assistant", "content": ai_response})
             
-            # Sauvegarder en base de données
-            for msg in st.session_state.ai_messages[-2:]:
-                msg_id = str(uuid.uuid4())
-                query = "INSERT INTO ai_messages (id, user_id, message, role) VALUES (?, ?, ?, ?)"
-                db.execute_query(query, (msg_id, st.session_state.user['id'], msg['content'], msg['role']))
-            
             st.rerun()
 
 elif page == "analytics":
@@ -1248,16 +1003,73 @@ elif page == "analytics":
     # Graphiques analytiques avancés
     analytics_tab1, analytics_tab2, analytics_tab3 = st.tabs(["📈 Performance", "🎯 Matching", "🌍 Marché"])
     
+    with analytics_tab1:
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            # Évolution des vues de profil
+            dates = pd.date_range('2024-08-01', periods=30, freq='D')
+            vues = np.random.poisson(12, 30) + np.sin(np.arange(30) * 0.2) * 3 + 12
+            
+            fig = px.line(x=dates, y=vues, title='📊 Évolution des vues de profil')
+            fig.update_traces(line_color='#667eea', line_width=3)
+            fig.add_hline(y=np.mean(vues), line_dash="dash", line_color="red", 
+                         annotation_text="Moyenne")
+            st.plotly_chart(fig, use_container_width=True)
+        
+        with col2:
+            # Taux de réponse aux contacts
+            response_data = pd.DataFrame({
+                'Semaine': ['S-4', 'S-3', 'S-2', 'S-1'],
+                'Envoyés': [12, 15, 18, 22],
+                'Réponses': [8, 11, 14, 17]
+            })
+            
+            fig = px.bar(response_data, x='Semaine', y=['Envoyés', 'Réponses'], 
+                        title='📧 Messages envoyés vs réponses', barmode='group')
+            st.plotly_chart(fig, use_container_width=True)
+    
+    with analytics_tab2:
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            # Distribution des scores de matching
+            scores = np.random.normal(75, 15, 100)
+            scores = np.clip(scores, 0, 100)
+            
+            fig = px.histogram(x=scores, nbins=20, title='📊 Distribution des scores de matching')
+            fig.update_traces(marker_color='#667eea')
+            fig.add_vline(x=np.mean(scores), line_dash="dash", line_color="red",
+                         annotation_text=f"Moyenne: {np.mean(scores):.1f}%")
+            st.plotly_chart(fig, use_container_width=True)
+        
+        with col2:
+            # Top critères de matching
+            criteres_data = pd.DataFrame({
+                'Critère': ['Budget', 'Localisation', 'Surface', 'Transport', 'Type bien'],
+                'Importance': [95, 88, 82, 76, 71]
+            })
+            
+            fig = px.bar(criteres_data, x='Importance', y='Critère', 
+                        title='🎯 Importance des critères', orientation='h')
+            fig.update_traces(marker_color='#28a745')
+            st.plotly_chart(fig, use_container_width=True)
+    
     with analytics_tab3:
         col1, col2 = st.columns(2)
         
         with col1:
             # Évolution des prix par ville
+            dates = pd.date_range('2024-01-01', periods=12, freq='M')
+            paris_prices = 9000 + np.cumsum(np.random.normal(20, 50, 12))
+            lyon_prices = 5000 + np.cumsum(np.random.normal(10, 30, 12))
+            marseille_prices = 4500 + np.cumsum(np.random.normal(15, 25, 12))
+            
             villes_data = pd.DataFrame({
-                'Mois': pd.date_range('2024-01-01', periods=12, freq='M'),
-                'Paris': np.random.normal(9500, 200, 12).cumsum(),
-                'Lyon': np.random.normal(5200, 100, 12).cumsum(),
-                'Marseille': np.random.normal(4800, 80, 12).cumsum()
+                'Mois': dates,
+                'Paris': paris_prices,
+                'Lyon': lyon_prices,
+                'Marseille': marseille_prices
             })
             
             fig = px.line(villes_data, x='Mois', y=['Paris', 'Lyon', 'Marseille'], 
@@ -1291,7 +1103,7 @@ elif page == "premium":
         """, unsafe_allow_html=True)
     
     with premium_col2:
-        current_plan = "Gratuit"  # Simulation
+        current_plan = "Gratuit"
         st.markdown(f"""
         <div class="metric-card">
             <h3>📊 Votre plan actuel</h3>
@@ -1319,7 +1131,6 @@ elif page == "premium":
                 <p>❌ Recommandations IA</p>
                 <p>❌ Agent IA personnel</p>
                 <p>❌ Analytics avancées</p>
-                <p>❌ Support prioritaire</p>
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -1328,8 +1139,7 @@ elif page == "premium":
     
     with plans_col2:
         st.markdown("""
-        <div style="background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%); padding: 2rem; border-radius: 15px; border: 3px solid #f0a500; text-align: center; position: relative;">
-            <div class="premium-badge" style="position: absolute; top: -10px; right: 10px;">POPULAIRE</div>
+        <div style="background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%); padding: 2rem; border-radius: 15px; border: 3px solid #f0a500; text-align: center;">
             <h3>⭐ PREMIUM</h3>
             <h2 style="color: #f0a500;">9.90€</h2>
             <p style="color: #666;">par mois</p>
@@ -1341,14 +1151,14 @@ elif page == "premium":
                 <p>✅ Analytics détaillées</p>
                 <p>✅ Contacts illimités</p>
                 <p>✅ Alertes temps réel</p>
-                <p>✅ Historique complet</p>
             </div>
         </div>
         """, unsafe_allow_html=True)
         
         if st.button("🚀 Passer à Premium", use_container_width=True):
             st.balloons()
-            st.success("🎉 Bienvenue dans Premium ! Redirection vers le paiement...")
+            st.success("🎉 Simulation : Bienvenue dans Premium !")
+            st.session_state.notifications.append("🎉 Upgrade vers Premium réalisé !")
     
     with plans_col3:
         st.markdown("""
@@ -1362,8 +1172,6 @@ elif page == "premium":
                 <p>✅ Gestion par professionnel</p>
                 <p>✅ Commission négociée</p>
                 <p>✅ Accompagnement juridique</p>
-                <p>✅ Visite organisée</p>
-                <p>✅ Dossier optimisé</p>
                 <p>✅ Support dédié</p>
             </div>
         </div>
@@ -1371,151 +1179,6 @@ elif page == "premium":
         
         if st.button("👑 Devenir Pro", use_container_width=True):
             st.success("👔 Demande envoyée ! Un conseiller vous contactera.")
-    
-    # Fonctionnalités premium en détail
-    st.subheader("🔥 Fonctionnalités Premium en action")
-    
-    feature_tab1, feature_tab2, feature_tab3 = st.tabs(["🤖 IA Avancée", "📊 Analytics Pro", "🎯 Matching+"])
-    
-    with feature_tab1:
-        col1, col2 = st.columns([1, 1])
-        
-        with col1:
-            st.markdown("""
-            ### 🧠 Agent IA Personnel
-            
-            **Capacités exclusives Premium :**
-            - 🔍 Analyse prédictive du marché
-            - 📈 Recommandations personnalisées temps réel
-            - 💬 Chat 24/7 avec mémoire contextuelle
-            - 🎯 Optimisation automatique des critères
-            - 📊 Rapports de marché hebdomadaires
-            """)
-            
-            if st.button("🎬 Voir une démo", key="demo_ai"):
-                st.info("🤖 'Basé sur l'évolution du marché, je recommande de visiter le 3P Bastille cette semaine. Le prix pourrait augmenter de 2% le mois prochain selon mes modèles prédictifs.'")
-        
-        with col2:
-            # Simulation conversation IA avancée
-            st.markdown("### 💬 Exemple de conversation Premium")
-            st.markdown("""
-            <div class="ai-chat">
-                <strong>🤖 Agent IA Premium:</strong><br>
-                📊 J'ai analysé 1,247 transactions similaires. Votre budget de 450k€ vous positionne dans le top 30% des acquéreurs pour ce secteur.
-                <br><br>
-                🎯 Recommandation: Négociez à 425k€ sur le bien Bastille. Probabilité d'acceptation: 73%
-                <br><br>
-                📈 Tendance: +2.1% d'augmentation prévue dans 3 mois dans ce quartier.
-            </div>
-            """, unsafe_allow_html=True)
-    
-    with feature_tab2:
-        st.markdown("### 📊 Analytics Professionnelles")
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            # Graphique avancé - Analyse prédictive
-            dates_future = pd.date_range('2024-09-01', periods=12, freq='M')
-            prix_pred = [450, 455, 462, 458, 467, 472, 478, 485, 482, 489, 495, 501]
-            
-            fig = go.Figure()
-            fig.add_trace(go.Scatter(
-                x=dates_future[:6], y=prix_pred[:6], 
-                name='Historique', line=dict(color='blue')
-            ))
-            fig.add_trace(go.Scatter(
-                x=dates_future[5:], y=prix_pred[5:], 
-                name='Prédiction IA', line=dict(color='red', dash='dash')
-            ))
-            fig.update_layout(title='🔮 Prédiction prix/m² - Paris 15e')
-            st.plotly_chart(fig, use_container_width=True)
-        
-        with col2:
-            # Heatmap des meilleurs quartiers
-            quartiers = ['Bastille', 'République', 'Marais', 'Belleville']
-            criteres = ['Prix', 'Évolution', 'Liquidité', 'Potentiel']
-            
-            heatmap_data = np.random.rand(4, 4) * 100
-            
-            fig = px.imshow(heatmap_data, x=criteres, y=quartiers, 
-                           title='🌡️ Analyse comparative quartiers')
-            st.plotly_chart(fig, use_container_width=True)
-    
-    with feature_tab3:
-        st.markdown("### 🎯 Matching Algorithm Pro")
-        
-        col1, col2 = st.columns([1, 1])
-        
-        with col1:
-            st.markdown("""
-            **Algorithme Premium vs Standard :**
-            
-            📊 **Standard (Gratuit):**
-            - 4 critères de base
-            - Mise à jour quotidienne
-            - Score simple
-            
-            🚀 **Premium:**
-            - 50+ critères analysés
-            - Mise à jour temps réel
-            - IA prédictive
-            - Analyse comportementale
-            - Score multicritères
-            """)
-        
-        with col2:
-            # Comparaison visuelle
-            comparison_data = pd.DataFrame({
-                'Métrique': ['Précision', 'Rapidité', 'Personnalisation', 'Prédiction'],
-                'Gratuit': [60, 70, 40, 0],
-                'Premium': [95, 95, 90, 85]
-            })
-            
-            fig = px.bar(comparison_data, x='Métrique', y=['Gratuit', 'Premium'], 
-                        title='📈 Performance des algorithmes', barmode='group')
-            st.plotly_chart(fig, use_container_width=True)
-    
-    # Témoignages clients
-    st.subheader("💬 Ce que disent nos clients Premium")
-    
-    temoignage_col1, temoignage_col2, temoignage_col3 = st.columns(3)
-    
-    testimonials = [
-        {
-            "nom": "Marie L.", 
-            "avatar": "👩‍💼",
-            "text": "J'ai trouvé mon appartement parfait en 2 semaines grâce à l'IA ! Les recommandations étaient ultra-précises.",
-            "note": "⭐⭐⭐⭐⭐"
-        },
-        {
-            "nom": "Pierre M.", 
-            "avatar": "👨‍💻",
-            "text": "L'agent IA m'a fait économiser 15k€ en me conseillant le bon moment pour négocier. Incroyable !",
-            "note": "⭐⭐⭐⭐⭐"
-        },
-        {
-            "nom": "Sophie D.", 
-            "avatar": "👩‍🎨",
-            "text": "Les analytics m'ont aidée à comprendre le marché. J'ai acheté au meilleur moment !",
-            "note": "⭐⭐⭐⭐⭐"
-        }
-    ]
-    
-    for i, temoignage in enumerate(testimonials):
-        with [temoignage_col1, temoignage_col2, temoignage_col3][i]:
-            st.markdown(f"""
-            <div class="recommendation-card">
-                <div style="display: flex; align-items: center; margin-bottom: 1rem;">
-                    <div style="font-size: 2em; margin-right: 1rem;">{temoignage['avatar']}</div>
-                    <div>
-                        <h4 style="margin: 0;">{temoignage['nom']}</h4>
-                        <div>{temoignage['note']}</div>
-                    </div>
-                </div>
-                <p style="font-style: italic;">"{temoignage['text']}"</p>
-            </div>
-            """, unsafe_allow_html=True)
 
 elif page == "marketplace":
     st.header("🏢 Marketplace des Services Immobiliers")
@@ -1527,239 +1190,50 @@ elif page == "marketplace":
     </div>
     """, unsafe_allow_html=True)
     
-    # Catégories de services
-    service_tab1, service_tab2, service_tab3, service_tab4 = st.tabs(["🏦 Financement", "⚖️ Juridique", "🔧 Expertise", "📋 Administratif"])
+    # Services disponibles
+    service_col1, service_col2, service_col3 = st.columns(3)
     
-    with service_tab1:
-        st.subheader("🏦 Partenaires Financiers")
+    with service_col1:
+        st.markdown("""
+        <div class="metric-card">
+            <h3>🏦 Financement</h3>
+            <p><strong>3 banques partenaires</strong></p>
+            <p>• Crédit Agricole - 3.85%</p>
+            <p>• BNP Paribas - 4.10%</p>
+            <p>• Courtier imoFinance - 3.75%</p>
+        </div>
+        """, unsafe_allow_html=True)
         
-        banques = [
-            {
-                "nom": "Crédit Agricole",
-                "logo": "🏦",
-                "specialite": "Primo-accédants",
-                "taux": "3.85%",
-                "note": 4.2,
-                "avantage": "Frais de dossier offerts via imoMatch"
-            },
-            {
-                "nom": "BNP Paribas",
-                "logo": "🏛️",
-                "specialite": "Investissement locatif",
-                "taux": "4.10%",
-                "note": 4.0,
-                "avantage": "Négociation privilégiée"
-            },
-            {
-                "nom": "Courtier imoFinance",
-                "logo": "💼",
-                "specialite": "Meilleur taux garanti",
-                "taux": "3.75%",
-                "note": 4.6,
-                "avantage": "Commission réduite -30%"
-            }
-        ]
-        
-        for banque in banques:
-            col1, col2, col3, col4 = st.columns([1, 2, 1, 1])
-            
-            with col1:
-                st.markdown(f"""
-                <div style="text-align: center; font-size: 3em;">
-                    {banque['logo']}
-                </div>
-                """, unsafe_allow_html=True)
-            
-            with col2:
-                st.markdown(f"""
-                **{banque['nom']}**  
-                *{banque['specialite']}*  
-                🎯 {banque['avantage']}  
-                ⭐ {banque['note']}/5
-                """)
-            
-            with col3:
-                st.metric("Taux indicatif", banque['taux'])
-            
-            with col4:
-                if st.button(f"📞 Contacter", key=f"bank_{banque['nom']}"):
-                    st.success("✅ Demande transmise !")
-                    notification_manager.create_notification(
-                        st.session_state.user['id'],
-                        "🏦 Contact banque",
-                        f"Votre demande a été transmise à {banque['nom']}",
-                        "info"
-                    )
-            
-            st.divider()
+        if st.button("🏦 Voir les offres", key="finance", use_container_width=True):
+            st.success("💰 Redirection vers nos partenaires financiers...")
     
-    with service_tab2:
-        st.subheader("⚖️ Services Juridiques")
+    with service_col2:
+        st.markdown("""
+        <div class="metric-card">
+            <h3>⚖️ Juridique</h3>
+            <p><strong>25 notaires référencés</strong></p>
+            <p>• Me. Dubois - Paris 15e</p>
+            <p>• Me. Martin - Lyon 6e</p>
+            <p>• Conseil juridique inclus</p>
+        </div>
+        """, unsafe_allow_html=True)
         
-        juridique_col1, juridique_col2 = st.columns(2)
-        
-        with juridique_col1:
-            st.markdown("### 👨‍⚖️ Notaires Partenaires")
-            
-            notaires = [
-                {"nom": "Me. Dubois", "ville": "Paris 15e", "note": 4.8, "specialite": "Vente résidentielle"},
-                {"nom": "Me. Martin", "ville": "Lyon 6e", "note": 4.6, "specialite": "Investissement"},
-                {"nom": "Me. Bernard", "ville": "Marseille", "note": 4.4, "specialite": "Primo-accédant"}
-            ]
-            
-            for notaire in notaires:
-                st.markdown(f"""
-                <div class="metric-card">
-                    <h4>⚖️ {notaire['nom']}</h4>
-                    <p>📍 {notaire['ville']}</p>
-                    <p>🎯 {notaire['specialite']}</p>
-                    <p>⭐ {notaire['note']}/5</p>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                if st.button(f"📅 Rendez-vous", key=f"notaire_{notaire['nom']}"):
-                    st.info("📞 Rendez-vous demandé !")
-        
-        with juridique_col2:
-            st.markdown("### 🏛️ Services Juridiques")
-            
-            services_juridiques = [
-                {"service": "Diagnostic juridique", "prix": "150€", "duree": "1h"},
-                {"service": "Relecture compromis", "prix": "200€", "duree": "48h"},
-                {"service": "Accompagnement signature", "prix": "300€", "duree": "½ jour"},
-                {"service": "Conseil fiscal", "prix": "180€", "duree": "1h"}
-            ]
-            
-            for service in services_juridiques:
-                col_s1, col_s2, col_s3 = st.columns([2, 1, 1])
-                
-                with col_s1:
-                    st.write(f"**{service['service']}**")
-                with col_s2:
-                    st.write(f"💰 {service['prix']}")
-                with col_s3:
-                    st.write(f"⏱️ {service['duree']}")
-                
-                st.divider()
+        if st.button("⚖️ Consulter", key="juridique", use_container_width=True):
+            st.success("📋 Mise en relation avec nos juristes...")
     
-    with service_tab3:
-        st.subheader("🔧 Expertise et Diagnostics")
+    with service_col3:
+        st.markdown("""
+        <div class="metric-card">
+            <h3>🔧 Expertise</h3>
+            <p><strong>15+ diagnostiqueurs</strong></p>
+            <p>• DPE, Termites, Plomb</p>
+            <p>• Expertise structure</p>
+            <p>• Tarifs négociés -20%</p>
+        </div>
+        """, unsafe_allow_html=True)
         
-        expert_col1, expert_col2 = st.columns(2)
-        
-        with expert_col1:
-            st.markdown("### 🏗️ Experts Bâtiment")
-            
-            experts = [
-                {"nom": "SAS DiagPro", "note": 4.7, "prix": "450€", "delai": "48h"},
-                {"nom": "Cabinet Expertise+", "note": 4.5, "prix": "380€", "delai": "72h"},
-                {"nom": "Diag Immo Express", "note": 4.3, "prix": "320€", "delai": "24h"}
-            ]
-            
-            for expert in experts:
-                st.markdown(f"""
-                <div class="property-card">
-                    <h4>🔬 {expert['nom']}</h4>
-                    <div style="display: flex; justify-content: space-between;">
-                        <span>⭐ {expert['note']}/5</span>
-                        <span>💰 {expert['prix']}</span>
-                        <span>⏱️ {expert['delai']}</span>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                if st.button(f"📋 Commander", key=f"expert_{expert['nom']}"):
-                    st.success("✅ Expertise commandée !")
-        
-        with expert_col2:
-            st.markdown("### 📊 Types de Diagnostics")
-            
-            diagnostics = [
-                {"type": "DPE + Termites", "obligatoire": True, "prix": "180€"},
-                {"type": "Expertise structure", "obligatoire": False, "prix": "280€"},
-                {"type": "Diagnostic électricité", "obligatoire": True, "prix": "120€"},
-                {"type": "Analyse humidité", "obligatoire": False, "prix": "200€"}
-            ]
-            
-            for diag in diagnostics:
-                obligation = "🔴 Obligatoire" if diag['obligatoire'] else "🟡 Conseillé"
-                
-                st.markdown(f"""
-                <div style="background: {'#ffe6e6' if diag['obligatoire'] else '#fff7e6'}; padding: 1rem; border-radius: 8px; margin: 0.5rem 0;">
-                    <strong>{diag['type']}</strong><br>
-                    {obligation} - {diag['prix']}
-                </div>
-                """, unsafe_allow_html=True)
-    
-    with service_tab4:
-        st.subheader("📋 Services Administratifs")
-        
-        admin_col1, admin_col2 = st.columns(2)
-        
-        with admin_col1:
-            st.markdown("### 📄 Gestion Administrative")
-            
-            services_admin = [
-                {"service": "Constitution dossier", "description": "Rassemblement de toutes les pièces", "prix": "80€"},
-                {"service": "Suivi administratif", "description": "Relance et coordination", "prix": "120€/mois"},
-                {"service": "Optimisation fiscale", "description": "Conseil déductibilité", "prix": "200€"},
-                {"service": "Assurance emprunteur", "description": "Comparatif et négociation", "prix": "150€"}
-            ]
-            
-            for service in services_admin:
-                st.markdown(f"""
-                <div class="recommendation-card">
-                    <h4>📋 {service['service']}</h4>
-                    <p>{service['description']}</p>
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <strong>💰 {service['prix']}</strong>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                if st.button(f"✅ Souscrire", key=f"admin_{service['service']}"):
-                    st.success("📋 Service ajouté à votre dossier !")
-        
-        with admin_col2:
-            st.markdown("### 📦 Packs Services")
-            
-            packs = [
-                {
-                    "nom": "Pack Découverte",
-                    "prix": "299€",
-                    "services": ["Diagnostic basic", "1h conseil juridique", "Dossier administratif"],
-                    "economie": "50€"
-                },
-                {
-                    "nom": "Pack Complet",
-                    "prix": "599€", 
-                    "services": ["Tous diagnostics", "Suivi complet", "Expertise", "Assurance"],
-                    "economie": "120€"
-                },
-                {
-                    "nom": "Pack Premium",
-                    "prix": "899€",
-                    "services": ["Pack Complet", "Conseiller dédié", "Négociation", "Garanties"],
-                    "economie": "200€"
-                }
-            ]
-            
-            for pack in packs:
-                st.markdown(f"""
-                <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 1.5rem; border-radius: 12px; color: white; margin: 1rem 0;">
-                    <h4 style="color: white; margin: 0;">{pack['nom']}</h4>
-                    <h3 style="color: white;">{pack['prix']}</h3>
-                    <p style="color: #ddd;">Économie: {pack['economie']}</p>
-                    
-                    <div style="background: rgba(255,255,255,0.1); padding: 1rem; border-radius: 8px; margin: 1rem 0;">
-                        {"<br>".join([f"✅ {s}" for s in pack['services']])}
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                if st.button(f"🛒 Choisir {pack['nom']}", key=f"pack_{pack['nom']}"):
-                    st.balloons()
-                    st.success(f"🎉 {pack['nom']} ajouté ! Vous économisez {pack['economie']} !")
+        if st.button("🔧 Commander", key="expertise", use_container_width=True):
+            st.success("🔍 Commande d'expertise en cours...")
 
 elif page == "virtual_tours":
     st.header("📹 Visites Virtuelles & Immersives")
@@ -1829,56 +1303,289 @@ elif page == "virtual_tours":
             st.metric("Étage", "4/6")
             st.metric("Orientation", "Sud-Ouest")
             
-            if st.button("📤 Partager la vi1:
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            # Évolution des vues de profil
-            dates = pd.date_range('2024-08-01', periods=30, freq='D')
-            vues = np.random.poisson(12, 30) + np.sin(np.arange(30) * 0.2) * 3 + 12
-            
-            fig = px.line(x=dates, y=vues, title='📊 Évolution des vues de profil')
-            fig.update_traces(line_color='#667eea', line_width=3)
-            fig.add_hline(y=np.mean(vues), line_dash="dash", line_color="red", 
-                         annotation_text="Moyenne")
-            st.plotly_chart(fig, use_container_width=True)
-        
-        with col2:
-            # Taux de réponse aux contacts
-            response_data = pd.DataFrame({
-                'Semaine': ['S-4', 'S-3', 'S-2', 'S-1'],
-                'Envoyés': [12, 15, 18, 22],
-                'Réponses': [8, 11, 14, 17]
-            })
-            
-            fig = px.bar(response_data, x='Semaine', y=['Envoyés', 'Réponses'], 
-                        title='📧 Messages envoyés vs réponses', barmode='group')
-            st.plotly_chart(fig, use_container_width=True)
+            if st.button("📤 Partager la visite", use_container_width=True):
+                st.success("🔗 Lien de partage généré !")
     
-    with analytics_tab2:
-        col1, col2 = st.columns(2)
+    with visit_tab2:
+        st.subheader("🥽 Expérience de Réalité Virtuelle")
         
-        with col1:
-            # Distribution des scores de matching
-            scores = np.random.normal(75, 15, 100)
-            scores = np.clip(scores, 0, 100)
-            
-            fig = px.histogram(x=scores, nbins=20, title='📊 Distribution des scores de matching')
-            fig.update_traces(marker_color='#667eea')
-            fig.add_vline(x=np.mean(scores), line_dash="dash", line_color="red",
-                         annotation_text=f"Moyenne: {np.mean(scores):.1f}%")
-            st.plotly_chart(fig, use_container_width=True)
+        vr_col1, vr_col2 = st.columns([1, 1])
         
-        with col2:
-            # Top critères de matching
-            criteres_data = pd.DataFrame({
-                'Critère': ['Budget', 'Localisation', 'Surface', 'Transport', 'Type bien'],
-                'Importance': [95, 88, 82, 76, 71]
-            })
+        with vr_col1:
+            st.markdown("""
+            ### 🎮 Visites VR Immersives
             
-            fig = px.bar(criteres_data, x='Importance', y='Critère', 
-                        title='🎯 Importance des critères', orientation='h')
-            fig.update_traces(marker_color='#28a745')
-            st.plotly_chart(fig, use_container_width=True)
+            **Équipements compatibles :**
+            - 🥽 Oculus Quest 2/3
+            - 🎮 PlayStation VR
+            - 📱 Smartphone + Casque VR
+            - 💻 PC + Casque VR
+            
+            **Fonctionnalités VR :**
+            - 👋 Interaction gestuelle
+            - 🚶‍♂️ Déplacement naturel  
+            - 📏 Mesures en temps réel
+            - 🪑 Placement de meubles
+            - 🎨 Changement déco en direct
+            """)
+            
+            if st.button("🥽 Lancer VR", use_container_width=True):
+                st.info("🚀 Simulation : Ouverture de l'application VR...")
+                st.markdown("""
+                <div class="ai-chat">
+                    <strong>🎮 Mode VR activé !</strong><br>
+                    Simulation : Mettez votre casque et utilisez les manettes pour explorer librement l'appartement.
+                    <br><br>
+                    💡 <em>Astuce: Pointez vers un objet et appuyez sur le trigger pour obtenir des informations.</em>
+                </div>
+                """, unsafe_allow_html=True)
+        
+        with vr_col2:
+            # Simulation d'interface VR
+            st.markdown("""
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 2rem; border-radius: 15px; color: white; text-align: center;">
+                <h3 style="color: white;">🏠 Interface VR</h3>
+                
+                <div style="background: rgba(255,255,255,0.1); padding: 1rem; border-radius: 10px; margin: 1rem 0;">
+                    <h4 style="color: white;">📍 Position actuelle</h4>
+                    <p style="color: #ddd;">Salon - Vue vers cuisine</p>
+                </div>
+                
+                <div style="background: rgba(255,255,255,0.1); padding: 1rem; border-radius: 10px; margin: 1rem 0;">
+                    <h4 style="color: white;">🎛️ Contrôles</h4>
+                    <div style="display: flex; justify-content: space-around; color: #ddd;">
+                        <div>🎮 Déplacer</div>
+                        <div>👆 Sélectionner</div>
+                        <div>📏 Mesurer</div>
+                    </div>
+                </div>
+                
+                <div style="background: rgba(255,255,255,0.1); padding: 1rem; border-radius: 10px;">
+                    <h4 style="color: white;">ℹ️ Objet sélectionné</h4>
+                    <p style="color: #ddd;">Fenêtre principale<br>Dimensions: 1.2m x 1.8m<br>Orientation: Sud</p>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
     
-    with analytics_tab
+    with visit_tab3:
+        st.subheader("📱 Réalité Augmentée Mobile")
+        
+        ar_col1, ar_col2 = st.columns([2, 1])
+        
+        with ar_col1:
+            st.markdown("""
+            ### 📲 Application imoMatch AR
+            
+            Scannez le QR code ci-dessous avec votre smartphone pour lancer l'expérience AR :
+            """)
+            
+            # QR Code simulé
+            st.markdown("""
+            <div style="background: white; padding: 2rem; border-radius: 15px; text-align: center; border: 2px solid #667eea;">
+                <div style="font-size: 8em;">📱</div>
+                <h3>QR Code AR</h3>
+                <p style="color: #666;">Pointez votre caméra ici</p>
+                <p style="font-size: 0.9em; color: #999;">Compatible iOS 12+ et Android 8+</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            st.markdown("""
+            **Fonctionnalités AR :**
+            - 📐 Mesures précises avec la caméra
+            - 🪑 Placement virtuel de meubles
+            - 🎨 Test de couleurs murales
+            - 💡 Simulation d'éclairage
+            - 📷 Capture photo/vidéo annotée
+            """)
+        
+        with ar_col2:
+            st.markdown("### 🔧 Outils AR")
+            
+            # Outils AR
+            ar_tool = st.selectbox("Outil sélectionné", [
+                "📏 Mètre laser",
+                "🪑 Placement mobilier", 
+                "🎨 Peinture murale",
+                "💡 Éclairage",
+                "📷 Annotation"
+            ])
+            
+            if ar_tool == "📏 Mètre laser":
+                st.info("📏 Pointez deux endroits pour mesurer la distance")
+            elif ar_tool == "🪑 Placement mobilier":
+                furniture = st.selectbox("Meuble", ["Canapé", "Table", "Lit", "Armoire"])
+                st.info(f"🪑 Glissez pour placer le {furniture.lower()}")
+            elif ar_tool == "🎨 Peinture murale":
+                color = st.color_picker("Couleur", "#FF6B6B")
+                st.info("🎨 Touchez un mur pour appliquer la couleur")
+    
+    # Galerie de visites disponibles
+    st.subheader("🎬 Galerie des Visites Virtuelles")
+    
+    # Liste des biens avec visites virtuelles
+    visites_disponibles = [
+        {
+            "titre": "Appartement 3P - Bastille",
+            "type": "Appartement",
+            "prix": "485k€",
+            "visites": ["360°", "VR", "AR"],
+            "vues": 1247,
+            "note": 4.8,
+            "duree": "12 min"
+        },
+        {
+            "titre": "Maison 5P - Vincennes", 
+            "type": "Maison",
+            "prix": "680k€",
+            "visites": ["360°", "AR"],
+            "vues": 892,
+            "note": 4.6,
+            "duree": "18 min"
+        },
+        {
+            "titre": "Loft 2P - République",
+            "type": "Loft", 
+            "prix": "520k€",
+            "visites": ["360°", "VR"],
+            "vues": 654,
+            "note": 4.7,
+            "duree": "8 min"
+        }
+    ]
+    
+    gallery_col1, gallery_col2 = st.columns([3, 1])
+    
+    with gallery_col2:
+        st.markdown("### 🔍 Filtres")
+        filter_type = st.multiselect("Type de bien", ["Appartement", "Maison", "Studio", "Loft"], default=["Appartement", "Maison", "Loft"])
+        filter_visit_type = st.multiselect("Type de visite", ["360°", "VR", "AR"], default=["360°", "VR", "AR"])
+        sort_by = st.selectbox("Trier par", ["Plus populaires", "Plus récentes", "Mieux notées", "Prix croissant"])
+    
+    with gallery_col1:
+        # Affichage des visites filtrées
+        for visite in visites_disponibles:
+            if (visite['type'] in filter_type and 
+                any(v in filter_visit_type for v in visite['visites'])):
+                
+                st.markdown(f"""
+                <div class="property-card">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <h4 style="margin: 0; color: #667eea;">{visite['titre']}</h4>
+                            <p style="margin: 0.2rem 0; color: #666;">{visite['type']} • {visite['prix']} • ⏱️ {visite['duree']}</p>
+                        </div>
+                        <div style="text-align: right;">
+                            <div style="font-size: 1.2em; font-weight: bold;">⭐ {visite['note']}</div>
+                            <div style="font-size: 0.9em; color: #666;">👁️ {visite['vues']} vues</div>
+                        </div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Boutons de visite
+                visit_col1, visit_col2, visit_col3, visit_col4 = st.columns(4)
+                
+                with visit_col1:
+                    if "360°" in visite['visites']:
+                        if st.button(f"🎥 Visite 360°", key=f"360_{visite['titre']}"):
+                            st.success("🎬 Lancement de la visite 360°...")
+                    else:
+                        st.button("🎥 360° (N/A)", disabled=True)
+                
+                with visit_col2:
+                    if "VR" in visite['visites']:
+                        if st.button(f"🥽 Mode VR", key=f"vr_{visite['titre']}"):
+                            st.info("🚀 Préparation de l'expérience VR...")
+                    else:
+                        st.button("🥽 VR (N/A)", disabled=True)
+                
+                with visit_col3:
+                    if "AR" in visite['visites']:
+                        if st.button(f"📱 AR Mobile", key=f"ar_{visite['titre']}"):
+                            st.info("📲 Ouverture de l'app mobile...")
+                    else:
+                        st.button("📱 AR (N/A)", disabled=True)
+                
+                with visit_col4:
+                    if st.button(f"❤️ Favoris", key=f"fav_vt_{visite['titre']}"):
+                        st.success("💖 Ajouté aux favoris !")
+                        st.session_state.notifications.append(f"❤️ {visite['titre']} ajouté aux favoris")
+                
+                st.divider()
+
+# Section footer avec statistiques et contact
+st.markdown("---")
+
+footer_col1, footer_col2, footer_col3 = st.columns(3)
+
+with footer_col1:
+    st.markdown("""
+    ### 📊 Statistiques Plateforme
+    
+    - 👥 **15,247** utilisateurs actifs
+    - 🏠 **3,891** biens référencés  
+    - 🎯 **2,156** matches réalisés
+    - ⭐ **4.8/5** satisfaction moyenne
+    """)
+
+with footer_col2:
+    st.markdown("""
+    ### 🤝 Nos Partenaires
+    
+    - 🏦 **25** banques partenaires
+    - ⚖️ **150** notaires référencés
+    - 🏢 **89** agences immobilières
+    - 🔧 **200+** professionnels certifiés
+    """)
+
+with footer_col3:
+    st.markdown("""
+    ### 📞 Support & Contact
+    
+    - 💬 **Chat IA 24/7** 
+    - 📧 support@imomatch.com
+    - 📱 +33 6 74 55 44 32
+    - 🕐 Support : Lun-Ven 9h-18h
+    """)
+
+# Footer principal avec informations sur le fondateur
+st.markdown("""
+<div style="text-align: center; padding: 3rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 15px; margin-top: 3rem; color: white;">
+    <h2 style="color: white; margin: 0;">🏠 imoMatch - La révolution immobilière par l'IA</h2>
+    <p style="font-size: 1.2em; margin: 1rem 0; color: #ddd;">Un Demandeur, Un Logement, Une Vente</p>
+    
+    <div style="background: rgba(255,255,255,0.1); padding: 2rem; border-radius: 10px; margin: 2rem 0;">
+        <h3 style="color: white;">👨‍💻 Yann Gouedo - Fondateur</h3>
+        <p style="color: #ddd; font-style: italic; font-size: 1.1em;">
+        "Ma motivation quotidienne est d'aider les citoyens et les entreprises à optimiser leur prise de décision grâce à l'intelligence artificielle, et ainsi les rendre plus efficaces."
+        </p>
+        <p style="color: #ddd;">
+        <strong>📧 Contact :</strong> +33 6 74 55 44 32 | yann@imomatch.com<br>
+        <strong>💼 Profil :</strong> Ingénieur en Mathématiques Appliquées, Expert Data Science & IA
+        </p>
+    </div>
+    
+    <div style="display: flex; justify-content: center; gap: 2rem; flex-wrap: wrap; margin-top: 2rem;">
+        <div style="background: rgba(255,255,255,0.1); padding: 1rem; border-radius: 8px;">
+            <strong>🎯 Mission</strong><br>
+            Démocratiser l'immobilier par l'IA
+        </div>
+        <div style="background: rgba(255,255,255,0.1); padding: 1rem; border-radius: 8px;">
+            <strong>🚀 Vision</strong><br>
+            L'UBER de l'immobilier
+        </div>
+        <div style="background: rgba(255,255,255,0.1); padding: 1rem; border-radius: 8px;">
+            <strong>💡 Innovation</strong><br>
+            Data Science & IA appliquées
+        </div>
+    </div>
+    
+    <p style="margin-top: 2rem; font-size: 0.9em; color: #bbb;">
+        © 2024 imoMatch - Tous droits réservés | Version MVP 1.0 - Compatible Streamlit Cloud
+    </p>
+</div>
+""", unsafe_allow_html=True)
+
+# Message de bienvenue pour les nouveaux utilisateurs
+if st.session_state.user and len(st.session_state.notifications) == 0:
+    st.session_state.notifications.append("🎉 Bienvenue sur imoMatch ! Complétez votre profil pour des recommandations personnalisées.")
