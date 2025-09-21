@@ -830,4 +830,5 @@ def contact_agent_page():
         
         st.header(f"Contacter l'agent - {prop['title']}")
         
-        with st.form("contact
+        with st.form("contact_agent_form"):
+           
