@@ -38,7 +38,7 @@ def score_transaction(acheteur, vendeur):
 # -------------------------------
 # Interface
 # -------------------------------
-st.title("🏡 imoMatcheeeee – Prototype IA")
+st.title("🏡 imoMat – Prototype IA")
 mode = st.radio("Vous êtes :", ["Acquéreur / Locataire", "Vendeur / Bailleur"])
 
 if mode == "Acquéreur / Locataire":
