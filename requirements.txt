@@ -5,6 +5,4 @@ plotly
 scikit-learn
 folium
 streamlit-folium
-sqlite3
-hashlib
 requests
