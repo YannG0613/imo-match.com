@@ -309,11 +309,13 @@ class DatabaseManager:
         cursor.execute("SELECT * FROM users WHERE email = ?", (email,))
         row = cursor.fetchone()
         
-        conn.close()
-        
         if row:
             columns = [description[0] for description in cursor.description]
-            return dict(zip(columns, row))
+            user_dict = dict(zip(columns, row))
+            conn.close()
+            return user_dict
+        
+        conn.close()
         return None
     
     def update_user(self, user_id: str, user_data: Dict) -> bool:
@@ -352,6 +354,9 @@ class DatabaseManager:
             if 'surface_min' in filters and filters['surface_min']:
                 conditions.append("surface >= ?")
                 params.append(filters['surface_min'])
+            if 'surface_max' in filters and filters['surface_max']:
+                conditions.append("surface <= ?")
+                params.append(filters['surface_max'])
             if 'nb_pieces' in filters and filters['nb_pieces']:
                 conditions.append("nb_pieces >= ?")
                 params.append(filters['nb_pieces'])
@@ -461,7 +466,7 @@ class ThemeManager:
             }}
             
             .agent-response {{
-                background: linear-gradient(135deg, {theme['primary_color']}22, {theme['secondary_color']}22);
+                background: linear-gradient(135deg, {theme['primary_color']}33, {theme['secondary_color']}33);
                 border-radius: 15px;
                 padding: 1rem;
                 margin: 1rem 0;
@@ -1026,338 +1031,101 @@ def render_register_page(auth_manager):
             st.session_state.page = 'login'
             st.rerun()
 
-def render_dashboard(user, db_manager):
-    """Affiche le tableau de bord"""
-    st.markdown(f"""
-    <div class="main-header">
-        <h1>📊 {get_text('dashboard')} - Bienvenue {user['prenom']}</h1>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Informations du plan utilisateur
-    plan_info = f"Plan {user['plan']}"
-    if user.get('plan_expiration') and user['plan'] == 'Premium':
-        expiration = datetime.fromisoformat(user['plan_expiration'])
-        if expiration > datetime.now():
-            days_left = (expiration - datetime.now()).days
-            plan_info += f" (Essai - {days_left} jours restants)"
-        else:
-            plan_info = "Plan Premium (Expiré)"
-    
-    st.info(f"🎯 {plan_info}")
-    
-    # Statistiques personnelles
-    col1, col2, col3, col4 = st.columns(4)
-    
-    # Récupération des propriétés correspondant aux critères de l'utilisateur
-    filters = {
-        'prix_min': user.get('budget_min', 0),
-        'prix_max': user.get('budget_max', float('inf')),
-        'surface_min': user.get('surface_min', 0),
-        'nb_pieces': user.get('nb_pieces_min', 1),
-        'type_bien': user.get('type_bien'),
-        'localisation': user.get('localisation_souhaitee')
-    }
-    
-    matching_properties = db_manager.get_properties(filters)
-    
-    with col1:
+def render_sidebar(user):
+    """Affiche la barre latérale avec navigation"""
+    with st.sidebar:
+        # Logo et informations utilisateur
         st.markdown(f"""
-        <div class="metric-card">
-            <h2 style="color: #FF6B35;">{len(matching_properties)}</h2>
-            <p>Biens correspondants</p>
+        <div style="text-align: center; padding: 1rem;">
+            <div style="font-size: 2rem;">🏠</div>
+            <h2 style="color: #FF6B35;">ImoMatch</h2>
+            <p>Bienvenue {user['prenom']} !</p>
         </div>
         """, unsafe_allow_html=True)
-    
-    with col2:
-        visits_count = 12  # Exemple
-        st.markdown(f"""
-        <div class="metric-card">
-            <h2 style="color: #FF6B35;">{visits_count}</h2>
-            <p>Visites planifiées</p>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col3:
-        favorites_count = 5  # Exemple
-        st.markdown(f"""
-        <div class="metric-card">
-            <h2 style="color: #FF6B35;">{favorites_count}</h2>
-            <p>Favoris sauvegardés</p>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col4:
-        completion_rate = AIAgent.analyze_profile_completion(user)['completion_rate']
-        st.markdown(f"""
-        <div class="metric-card">
-            <h2 style="color: #FF6B35;">{completion_rate:.0f}%</h2>
-            <p>Profil complété</p>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    # Graphiques et analyses
-    st.subheader("📈 Analyse de votre recherche")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        if matching_properties:
-            # Graphique des prix
-            prices = [prop['prix'] for prop in matching_properties]
-            fig = px.histogram(x=prices, nbins=10, title="Distribution des prix des biens correspondants")
-            fig.update_traces(marker_color='#FF6B35')
-            fig.update_layout(
-                xaxis_title="Prix (€)",
-                yaxis_title="Nombre de biens",
-                showlegend=False
-            )
-            st.plotly_chart(fig, use_container_width=True)
-    
-    with col2:
-        if matching_properties:
-            # Graphique des surfaces
-            surfaces = [prop['surface'] for prop in matching_properties]
-            fig = px.histogram(x=surfaces, nbins=10, title="Distribution des surfaces")
-            fig.update_traces(marker_color='#F7931E')
-            fig.update_layout(
-                xaxis_title="Surface (m²)",
-                yaxis_title="Nombre de biens",
-                showlegend=False
-            )
-            st.plotly_chart(fig, use_container_width=True)
-    
-    # Dernières recommandations
-    st.subheader("🎯 Dernières recommandations")
-    
-    if matching_properties:
-        recommendations = AIAgent.generate_recommendations(user, matching_properties)
         
-        for i, prop in enumerate(recommendations[:3]):  # Top 3
-            with st.expander(f"🏠 {prop['titre']} - Score: {prop['match_score']}/100"):
-                col1, col2 = st.columns([2, 1])
-                
-                with col1:
-                    st.write(f"**Prix:** {prop['prix']:,} €")
-                    st.write(f"**Surface:** {prop['surface']} m²")
-                    st.write(f"**Pièces:** {prop['nb_pieces']}")
-                    st.write(f"**Localisation:** {prop['localisation']}")
-                    st.write(f"**Description:** {prop['description']}")
-                    
-                    # Raisons du matching
-                    st.write("**Pourquoi ce bien vous correspond:**")
-                    for reason in prop['match_reasons']:
-                        st.write(f"✅ {reason}")
-                
-                with col2:
-                    if st.button(f"Voir détails", key=f"detail_{i}"):
-                        st.session_state.selected_property = prop['id']
-                        st.session_state.page = 'property_detail'
-                        st.rerun()
-                    
-                    if st.button(f"💝 Ajouter aux favoris", key=f"fav_{i}"):
-                        st.success("Ajouté aux favoris !")
-    else:
-        st.info("Aucun bien ne correspond actuellement à vos critères. Modifiez vos critères dans 'Mes informations' pour voir plus de résultats.")
-    
-    # Suggestions d'amélioration du profil
-    profile_analysis = AIAgent.analyze_profile_completion(user)
-    if profile_analysis['completion_rate'] < 100:
-        st.subheader("🎯 Complétez votre profil pour de meilleurs résultats")
+        # Navigation
+        st.markdown("### 🗺️ Navigation")
         
-        suggestions = AIAgent.get_completion_suggestions(user, profile_analysis['missing_fields'])
-        for suggestion in suggestions[:3]:
-            st.info(f"💡 {suggestion}")
-        
-        if st.button("Compléter mon profil maintenant"):
-            st.session_state.page = 'my_info'
-            st.rerun()
-
-def render_my_info_page(user, db_manager):
-    """Affiche la page des informations utilisateur"""
-    st.markdown(f"""
-    <div class="main-header">
-        <h1>👤 {get_text('my_info')}</h1>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Analyse du profil
-    profile_analysis = AIAgent.analyze_profile_completion(user)
-    
-    col1, col2 = st.columns([3, 1])
-    
-    with col1:
-        st.markdown(f"""
-        <div class="value-card">
-            <h3>Complétude de votre profil: {profile_analysis['completion_rate']:.0f}%</h3>
-            <div style="background-color: #ddd; border-radius: 10px; height: 20px;">
-                <div style="background: linear-gradient(90deg, #FF6B35, #F7931E); 
-                            width: {profile_analysis['completion_rate']}%; 
-                            height: 20px; border-radius: 10px;"></div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col2:
-        if st.button("🤖 Agent AI", use_container_width=True):
-            st.session_state.page = 'agent_ai'
-            st.rerun()
-    
-    # Formulaire de mise à jour des informations
-    with st.form("update_info_form"):
-        st.subheader("👤 Informations personnelles")
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            prenom = st.text_input("Prénom", value=user.get('prenom', ''))
-            nom = st.text_input("Nom", value=user.get('nom', ''))
-            email = st.text_input("Email", value=user.get('email', ''))
-        
-        with col2:
-            telephone = st.text_input("Téléphone", value=user.get('telephone', ''))
-            profession = st.text_input("Profession", value=user.get('profession', ''))
-            situation_familiale = st.selectbox(
-                "Situation familiale", 
-                ["Célibataire", "Marié(e)", "Pacsé(e)", "Divorcé(e)", "Veuf/Veuve"],
-                index=["Célibataire", "Marié(e)", "Pacsé(e)", "Divorcé(e)", "Veuf/Veuve"].index(user.get('situation_familiale', 'Célibataire')) if user.get('situation_familiale') in ["Célibataire", "Marié(e)", "Pacsé(e)", "Divorcé(e)", "Veuf/Veuve"] else 0
-            )
-        
-        st.subheader("💰 Informations financières")
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            revenus = st.number_input("Revenus mensuels (€)", min_value=0.0, step=100.0, value=float(user.get('revenus', 0)))
-            apport = st.number_input("Apport personnel (€)", min_value=0.0, step=1000.0, value=float(user.get('apport', 0)))
-        
-        with col2:
-            credits_en_cours = st.number_input("Crédits en cours (€)", min_value=0.0, step=100.0, value=float(user.get('credits_en_cours', 0)))
-        
-        st.subheader("🏠 Critères de recherche")
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            localisation_actuelle = st.text_input("Localisation actuelle", value=user.get('localisation_actuelle', ''))
-            localisation_souhaitee = st.text_input("Localisation souhaitée", value=user.get('localisation_souhaitee', ''))
-            type_bien = st.selectbox(
-                "Type de bien", 
-                ["", "Appartement", "Maison", "Studio", "Loft", "Duplex"],
-                index=["", "Appartement", "Maison", "Studio", "Loft", "Duplex"].index(user.get('type_bien', '')) if user.get('type_bien') in ["", "Appartement", "Maison", "Studio", "Loft", "Duplex"] else 0
-            )
-        
-        with col2:
-            budget_min = st.number_input("Budget minimum (€)", min_value=0.0, step=10000.0, value=float(user.get('budget_min', 0)))
-            budget_max = st.number_input("Budget maximum (€)", min_value=0.0, step=10000.0, value=float(user.get('budget_max', 0)))
-            surface_min = st.number_input("Surface minimum (m²)", min_value=0.0, step=5.0, value=float(user.get('surface_min', 0)))
-        
-        nb_pieces_min = st.number_input("Nombre de pièces minimum", min_value=1, step=1, value=int(user.get('nb_pieces_min', 1)))
-        
-        # Critères spécifiques
-        st.subheader("🎯 Critères spécifiques")
-        current_criteria = json.loads(user.get('criteres_specifiques', '{}')) if user.get('criteres_specifiques') else {}
-        
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            balcon = st.checkbox("Balcon/Terrasse", value=current_criteria.get('balcon', False))
-            parking = st.checkbox("Parking/Garage", value=current_criteria.get('parking', False))
-        with col2:
-            ascenseur = st.checkbox("Ascenseur", value=current_criteria.get('ascenseur', False))
-            jardin = st.checkbox("Jardin", value=current_criteria.get('jardin', False))
-        with col3:
-            piscine = st.checkbox("Piscine", value=current_criteria.get('piscine', False))
-            cave = st.checkbox("Cave/Cellier", value=current_criteria.get('cave', False))
-        
-        criteres_specifiques = {
-            'balcon': balcon, 'parking': parking, 'ascenseur': ascenseur,
-            'jardin': jardin, 'piscine': piscine, 'cave': cave
-        }
-        
-        submit = st.form_submit_button("💾 Sauvegarder les modifications", use_container_width=True)
-        
-        if submit:
-            update_data = {
-                'prenom': prenom,
-                'nom': nom,
-                'email': email,
-                'telephone': telephone,
-                'profession': profession,
-                'situation_familiale': situation_familiale,
-                'revenus': revenus,
-                'apport': apport,
-                'credits_en_cours': credits_en_cours,
-                'localisation_actuelle': localisation_actuelle,
-                'localisation_souhaitee': localisation_souhaitee,
-                'type_bien': type_bien,
-                'budget_min': budget_min,
-                'budget_max': budget_max,
-                'surface_min': surface_min,
-                'nb_pieces_min': nb_pieces_min,
-                'criteres_specifiques': json.dumps(criteres_specifiques)
-            }
-            
-            if db_manager.update_user(user['user_id'], update_data):
-                st.success("✅ Informations mises à jour avec succès !")
-                # Mettre à jour la session
-                for key, value in update_data.items():
-                    st.session_state.user[key] = value
-                time.sleep(1)
-                st.rerun()
-            else:
-                st.error("❌ Erreur lors de la mise à jour")
-
-def render_agent_ai_page(user, db_manager):
-    """Affiche la page de l'agent IA"""
-    st.markdown(f"""
-    <div class="main-header">
-        <h1>🤖 Agent IA - Assistant Personnel</h1>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    st.markdown("""
-    <div class="value-card">
-        <h3>🎯 Comment puis-je vous aider ?</h3>
-        <p>Je suis votre assistant personnel IA. Je peux vous aider à :</p>
-        <ul>
-            <li>Compléter votre profil pour de meilleures recommandations</li>
-            <li>Analyser vos critères de recherche</li>
-            <li>Vous conseiller sur votre capacité d'emprunt</li>
-            <li>Répondre à vos questions sur l'immobilier</li>
-        </ul>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Analyse du profil
-    profile_analysis = AIAgent.analyze_profile_completion(user)
-    
-    if profile_analysis['completion_rate'] < 100:
-        st.subheader("🔍 Suggestions pour améliorer votre profil")
-        
-        suggestions = AIAgent.get_completion_suggestions(user, profile_analysis['missing_fields'])
-        
-        for i, suggestion in enumerate(suggestions):
-            st.markdown(f"""
-            <div class="agent-response">
-                <strong>💡 Suggestion {i+1}:</strong><br>
-                {suggestion}
-            </div>
-            """, unsafe_allow_html=True)
-    
-    # Chat avec l'agent IA
-    st.subheader("💬 Conversation avec l'Agent IA")
-    
-    # Initialiser l'historique de conversation
-    if 'ai_conversation' not in st.session_state:
-        st.session_state.ai_conversation = [
-            {"role": "assistant", "content": f"Bonjour {user['prenom']} ! Je suis votre assistant IA personnalisé. Comment puis-je vous aider aujourd'hui ?"}
+        menu_items = [
+            ("📊 Dashboard", "dashboard"),
+            ("👤 Mes informations", "my_info"),
+            ("🎯 Recommandations", "recommendations"),
+            ("🔍 Recherche avancée", "advanced_search"),
+            ("🤖 Agent AI", "agent_ai")
         ]
+        
+        for label, page_key in menu_items:
+            if st.button(label, use_container_width=True):
+                st.session_state.page = page_key
+                st.rerun()
+        
+        st.markdown("---")
+        
+        # Informations du plan
+        plan_color = "#4CAF50" if user['plan'] == 'Free' else "#FF9800" if user['plan'] == 'Premium' else "#9C27B0"
+        st.markdown(f"""
+        <div style="background: {plan_color}22; padding: 1rem; border-radius: 10px; border: 1px solid {plan_color};">
+            <h4 style="color: {plan_color}; margin: 0;">Plan {user['plan']}</h4>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">
+                {'Accès limité' if user['plan'] == 'Free' else 'Accès premium' if user['plan'] == 'Premium' else 'Accès professionnel'}
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        if user['plan'] == 'Free':
+            if st.button("⬆️ Passer au Premium", use_container_width=True):
+                st.info("Redirection vers la page d'upgrade...")
+        
+        st.markdown("---")
+        
+        # Déconnexion
+        if st.button("🚪 Déconnexion", use_container_width=True):
+            st.session_state.authenticated = False
+            st.session_state.user = None
+            st.session_state.page = 'home'
+            st.rerun()
+
+def main():
+    """Fonction principale de l'application"""
+    # Initialisation
+    init_session_state()
     
-    # Afficher l'historique de conversation
-    for message in st.session_state.ai_conversation:
-        if message["role"] == "user":
-            st.markdown(f"""
-            <div style="background-color: #e3f2fd; padding: 1rem; border-radius: 10px; margin: 1rem 0; margin-left: 20%;">
-                <strong>Vous:</strong> {message['content']}
-            </div>
-            """, unsafe_allow_html=True)
+    # Application du thème
+    ThemeManager.apply_theme(st.session_state.theme)
+    
+    # Initialisation des managers
+    db_manager = DatabaseManager()
+    auth_manager = AuthManager(db_manager)
+    
+    # Routing de l'application
+    if not st.session_state.authenticated:
+        # Pages publiques
+        if st.session_state.page == 'home':
+            render_home_page(db_manager, auth_manager)
+        elif st.session_state.page == 'login':
+            render_login_page(auth_manager)
+        elif st.session_state.page == 'register':
+            render_register_page(auth_manager)
         else:
-            st.markdown(f
+            render_home_page(db_manager, auth_manager)
+    else:
+        # Pages authentifiées
+        user = st.session_state.user
+        render_sidebar(user)
+        
+        if st.session_state.page == 'dashboard':
+            st.write("Dashboard en cours de développement...")
+        elif st.session_state.page == 'my_info':
+            st.write("Mes informations en cours de développement...")
+        elif st.session_state.page == 'recommendations':
+            st.write("Recommandations en cours de développement...")
+        elif st.session_state.page == 'advanced_search':
+            st.write("Recherche avancée en cours de développement...")
+        elif st.session_state.page == 'agent_ai':
+            st.write("Agent AI en cours de développement...")
+        else:
+            st.write("Dashboard en cours de développement...")
+
+# Point d'entrée de l'application
+if __name__ == "__main__":
+    main()
