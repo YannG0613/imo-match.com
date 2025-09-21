@@ -7,9 +7,16 @@ import sqlite3
 import hashlib
 import json
 from typing import Dict, List, Optional, Tuple
-import openai
 import folium
 from streamlit_folium import st_folium
+import random
+
+# Gestion optionnelle d'OpenAI
+try:
+    import openai
+    OPENAI_AVAILABLE = True
+except ImportError:
+    OPENAI_AVAILABLE = False
 
 # ================================
 # CONFIGURATION ET CONSTANTES
@@ -724,4 +731,500 @@ def show_ai_agent():
     with col2:
         if st.button("Optimiser mes critères de recherche"):
             st.session_state.chat_history.append({"role": "user", "content": "Optimiser mes critères de recherche"})
-            ai_response = "Analysons vos critères actuels. Je vois que vous cherchez un bien entre " + str(st.session_state.db.get_user_preferences(st.session_state.user['id']) or {}).get('budget_min', 'N/A') + "€ et " + str(st.session_
+            prefs = st.session_state.db.get_user_preferences(st.session_state.user['id']) or {}
+            budget_info = f"{prefs.get('budget_min', 'N/A')}€ et {prefs.get('budget_max', 'N/A')}€" if prefs.get('budget_min') else "non défini"
+            ai_response = f"Analysons vos critères actuels. Votre budget est {budget_info}. Voulez-vous que j'analyse le marché pour optimiser vos chances de trouver le bien idéal ?"
+            st.session_state.chat_history.append({"role": "assistant", "content": ai_response})
+            st.rerun()
+        
+        if st.button("Analyser le marché immobilier"):
+            st.session_state.chat_history.append({"role": "user", "content": "Analyser le marché immobilier"})
+            ai_response = "D'après les données récentes, le marché immobilier dans votre zone de recherche présente les tendances suivantes : prix en hausse de 3% sur l'année, délai moyen de vente de 45 jours. Souhaitez-vous des conseils personnalisés ?"
+            st.session_state.chat_history.append({"role": "assistant", "content": ai_response})
+            st.rerun()
+
+def generate_ai_response(user_input: str, user: Dict) -> str:
+    """Génère une réponse de l'IA basée sur l'input utilisateur"""
+    # Simulation d'une réponse IA (en production, utilisez OpenAI, Claude, etc.)
+    user_input_lower = user_input.lower()
+    
+    if "budget" in user_input_lower:
+        return f"Bonjour {user.get('first_name', '')} ! Pour définir votre budget optimal, je recommande de ne pas dépasser 30% de vos revenus mensuels en remboursement. Avec votre profil ({user.get('profession', 'professionnel')}), voulez-vous que nous calculions ensemble votre capacité d'emprunt ?"
+    
+    elif "quartier" in user_input_lower or "zone" in user_input_lower:
+        return "Basé sur vos préférences, je peux analyser les quartiers qui correspondent à vos critères. Privilégiez-vous la proximité des transports, des écoles, ou des commerces ? Votre lieu de travail influence-t-il votre choix ?"
+    
+    elif "marché" in user_input_lower or "prix" in user_input_lower:
+        return "Le marché immobilier évolue constamment. Dans votre zone de recherche, les prix ont évolué de +2.5% ces 6 derniers mois. Je peux vous alerter sur les bonnes opportunités si vous le souhaitez."
+    
+    else:
+        return "Je comprends votre question. Basé sur votre profil, je peux vous donner des conseils personnalisés pour votre recherche immobilière. Pouvez-vous être plus spécifique sur ce que vous souhaitez améliorer ?"
+
+def show_search_page():
+    """Page de recherche avancée avec carte interactive"""
+    st.markdown("# 🔍 Recherche avancée")
+    
+    # Formulaire de recherche
+    with st.form("advanced_search"):
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            location = st.text_input("Localisation", placeholder="Paris, Lyon, Marseille...")
+            property_type = st.selectbox("Type de bien", ["Tous", "Appartement", "Maison", "Studio", "Loft"])
+            bedrooms = st.selectbox("Chambres", ["Indifférent", "1", "2", "3", "4", "5+"])
+        
+        with col2:
+            budget_min = st.number_input("Budget min (€)", min_value=0, step=10000, value=100000)
+            budget_max = st.number_input("Budget max (€)", min_value=0, step=10000, value=500000)
+            surface_min = st.number_input("Surface min (m²)", min_value=0, step=10, value=50)
+        
+        with col3:
+            amenities = st.multiselect("Équipements souhaités", 
+                                     ["Parking", "Balcon", "Terrasse", "Ascenseur", "Cave", "Jardin"])
+            transport = st.selectbox("Proximité transports", ["Indifférent", "Métro", "RER", "Bus", "Tramway"])
+            
+        submitted = st.form_submit_button("🔍 Lancer la recherche", use_container_width=True)
+    
+    if submitted:
+        # Simulation de données de recherche
+        results = generate_mock_properties(location, property_type, budget_min, budget_max)
+        
+        if results:
+            st.success(f"✅ {len(results)} biens trouvés correspondant à vos critères")
+            
+            # Onglets pour afficher les résultats
+            tab1, tab2 = st.tabs(["📋 Liste des biens", "🗺️ Carte interactive"])
+            
+            with tab1:
+                show_property_list(results)
+            
+            with tab2:
+                show_interactive_map(results)
+        else:
+            st.warning("Aucun bien ne correspond à vos critères. Essayez d'élargir votre recherche.")
+
+def generate_mock_properties(location, property_type, budget_min, budget_max):
+    """Génère des données fictives de propriétés"""
+    import random
+    
+    properties = []
+    locations_coords = {
+        "paris": [(48.8566, 2.3522), (48.8584, 2.2945), (48.8738, 2.2950)],
+        "lyon": [(45.7640, 4.8357), (45.7489, 4.8467), (45.7797, 4.8278)],
+        "marseille": [(43.2965, 5.3698), (43.3102, 5.3781), (43.2841, 5.3656)]
+    }
+    
+    base_coords = locations_coords.get(location.lower(), [(48.8566, 2.3522)])
+    
+    for i in range(random.randint(5, 15)):
+        coord = random.choice(base_coords)
+        price = random.randint(budget_min, min(budget_max, budget_min + 200000))
+        
+        property_data = {
+            'id': i + 1,
+            'title': f"Bel appartement {random.randint(2,4)} pièces - {location}",
+            'price': price,
+            'property_type': random.choice(["Appartement", "Maison", "Studio"]),
+            'bedrooms': random.randint(1, 4),
+            'bathrooms': random.randint(1, 2),
+            'surface': random.randint(40, 120),
+            'location': f"{location} - {random.choice(['Centre', 'Nord', 'Sud', 'Est', 'Ouest'])}",
+            'latitude': coord[0] + random.uniform(-0.05, 0.05),
+            'longitude': coord[1] + random.uniform(-0.05, 0.05),
+            'description': f"Magnifique {property_data.get('property_type', 'bien')} de {random.randint(40,120)}m² dans un quartier recherché.",
+            'features': random.sample(["Parking", "Balcon", "Terrasse", "Ascenseur", "Cave"], random.randint(1,3))
+        }
+        properties.append(property_data)
+    
+    return properties
+
+def show_property_list(properties):
+    """Affiche la liste des propriétés"""
+    for prop in properties:
+        with st.container():
+            col1, col2, col3 = st.columns([2, 2, 1])
+            
+            with col1:
+                st.markdown(f"### {prop['title']}")
+                st.markdown(f"📍 {prop['location']}")
+                st.markdown(f"📐 {prop['surface']}m² • 🛏️ {prop['bedrooms']} ch. • 🚿 {prop['bathrooms']} sdb")
+            
+            with col2:
+                st.markdown(f"### 💰 {prop['price']:,}€")
+                if prop.get('features'):
+                    st.markdown("🏷️ " + " • ".join(prop['features']))
+                st.markdown(prop['description'])
+            
+            with col3:
+                if st.button(f"Voir détails", key=f"detail_{prop['id']}"):
+                    show_property_details(prop)
+                
+                if st.button(f"❤️ Favoris", key=f"fav_{prop['id']}"):
+                    st.success("Ajouté aux favoris !")
+            
+            st.divider()
+
+def show_property_details(property_data):
+    """Affiche les détails d'une propriété dans un modal"""
+    with st.expander(f"Détails - {property_data['title']}", expanded=True):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("### Informations générales")
+            st.markdown(f"**Prix :** {property_data['price']:,}€")
+            st.markdown(f"**Type :** {property_data['property_type']}")
+            st.markdown(f"**Surface :** {property_data['surface']}m²")
+            st.markdown(f"**Chambres :** {property_data['bedrooms']}")
+            st.markdown(f"**Salles de bain :** {property_data['bathrooms']}")
+        
+        with col2:
+            st.markdown("### Localisation")
+            st.markdown(f"**Adresse :** {property_data['location']}")
+            st.markdown(f"**Coordonnées :** {property_data['latitude']:.4f}, {property_data['longitude']:.4f}")
+            
+            if property_data.get('features'):
+                st.markdown("### Équipements")
+                for feature in property_data['features']:
+                    st.markdown(f"✅ {feature}")
+
+def show_interactive_map(properties):
+    """Affiche une carte interactive avec les propriétés"""
+    if not properties:
+        st.warning("Aucune propriété à afficher sur la carte")
+        return
+    
+    # Centre de la carte basé sur la première propriété
+    center_lat = properties[0]['latitude']
+    center_lon = properties[0]['longitude']
+    
+    # Création de la carte avec Folium
+    m = folium.Map(location=[center_lat, center_lon], zoom_start=12)
+    
+    # Ajout des marqueurs pour chaque propriété
+    for prop in properties:
+        popup_text = f"""
+        <b>{prop['title']}</b><br>
+        💰 {prop['price']:,}€<br>
+        📐 {prop['surface']}m²<br>
+        🛏️ {prop['bedrooms']} chambres<br>
+        📍 {prop['location']}
+        """
+        
+        folium.Marker(
+            location=[prop['latitude'], prop['longitude']],
+            popup=folium.Popup(popup_text, max_width=300),
+            tooltip=f"{prop['price']:,}€",
+            icon=folium.Icon(color='orange', icon='home')
+        ).add_to(m)
+    
+    # Affichage de la carte
+    map_data = st_folium(m, width=700, height=500, returned_objects=["last_object_clicked_popup"])
+    
+    # Affichage des détails si un marqueur est cliqué
+    if map_data['last_object_clicked_popup']:
+        clicked_property = None
+        # Ici, vous pourriez identifier la propriété cliquée et afficher ses détails
+        st.info("Propriété sélectionnée sur la carte")
+
+def show_recommendations_page():
+    """Page des recommandations avec radar des critères"""
+    st.markdown("# 🎯 Recommandations personnalisées")
+    
+    user_prefs = st.session_state.db.get_user_preferences(st.session_state.user['id'])
+    
+    if not user_prefs:
+        st.warning("⚠️ Veuillez d'abord renseigner vos préférences dans la section 'Mes informations'")
+        return
+    
+    # Radar des critères
+    st.markdown("## 📊 Analyse de vos critères")
+    
+    # Données pour le radar chart
+    criteria = ['Budget', 'Localisation', 'Surface', 'Transport', 'Commodités', 'Environnement']
+    values = [85, 75, 90, 60, 70, 80]  # Scores basés sur les préférences utilisateur
+    
+    fig = go.Figure()
+    
+    fig.add_trace(go.Scatterpolar(
+        r=values,
+        theta=criteria,
+        fill='toself',
+        name='Vos critères',
+        line_color=COLORS['primary']
+    ))
+    
+    fig.update_layout(
+        polar=dict(
+            radialaxis=dict(
+                visible=True,
+                range=[0, 100]
+            )),
+        showlegend=True,
+        title="Radar de vos critères de recherche"
+    )
+    
+    st.plotly_chart(fig, use_container_width=True)
+    
+    # Recommandations basées sur le profil
+    st.markdown("## 🏠 Biens recommandés pour vous")
+    
+    recommended_properties = generate_recommendations(user_prefs)
+    
+    for i, prop in enumerate(recommended_properties[:5]):  # Top 5 recommandations
+        with st.container():
+            col1, col2, col3 = st.columns([3, 2, 1])
+            
+            with col1:
+                st.markdown(f"### {prop['title']}")
+                st.markdown(f"📍 {prop['location']}")
+                
+                # Score de compatibilité
+                compatibility_score = prop.get('compatibility_score', 85)
+                st.progress(compatibility_score / 100, f"Compatibilité: {compatibility_score}%")
+                
+                # Raisons de la recommandation
+                reasons = prop.get('reasons', ['Prix dans votre budget', 'Localisation préférée'])
+                st.markdown("**Pourquoi ce bien :**")
+                for reason in reasons:
+                    st.markdown(f"✅ {reason}")
+            
+            with col2:
+                st.markdown(f"### 💰 {prop['price']:,}€")
+                st.markdown(f"📐 {prop['surface']}m² • 🛏️ {prop['bedrooms']} ch.")
+                
+                # Graphique de comparaison prix/m²
+                price_per_sqm = prop['price'] / prop['surface']
+                market_avg = 5500  # Prix moyen du marché au m²
+                
+                fig_bar = go.Figure()
+                fig_bar.add_trace(go.Bar(
+                    x=['Ce bien', 'Marché'],
+                    y=[price_per_sqm, market_avg],
+                    marker_color=[COLORS['primary'], COLORS['light']]
+                ))
+                fig_bar.update_layout(
+                    title="Prix au m²",
+                    yaxis_title="€/m²",
+                    height=200,
+                    showlegend=False
+                )
+                st.plotly_chart(fig_bar, use_container_width=True)
+            
+            with col3:
+                if st.button(f"Voir détails", key=f"rec_detail_{i}"):
+                    show_property_details(prop)
+                
+                if st.button(f"❤️ Favoris", key=f"rec_fav_{i}"):
+                    st.success("Ajouté aux favoris !")
+                
+                if st.button(f"📞 Contacter", key=f"rec_contact_{i}"):
+                    st.info("Agent contacté !")
+            
+            st.divider()
+
+def generate_recommendations(user_prefs):
+    """Génère des recommandations basées sur les préférences utilisateur"""
+    import random
+    
+    recommendations = []
+    
+    for i in range(10):
+        # Génère des biens qui correspondent mieux aux préférences
+        price = random.randint(
+            max(user_prefs.get('budget_min', 100000) - 50000, 50000),
+            user_prefs.get('budget_max', 500000)
+        )
+        
+        prop = {
+            'id': i + 100,
+            'title': f"Recommandation {i+1} - {user_prefs.get('property_type', 'Appartement')}",
+            'price': price,
+            'property_type': user_prefs.get('property_type', 'Appartement'),
+            'bedrooms': user_prefs.get('bedrooms', 2),
+            'bathrooms': user_prefs.get('bathrooms', 1),
+            'surface': random.randint(user_prefs.get('surface_min', 50), user_prefs.get('surface_min', 50) + 50),
+            'location': user_prefs.get('location', 'Paris'),
+            'latitude': 48.8566 + random.uniform(-0.1, 0.1),
+            'longitude': 2.3522 + random.uniform(-0.1, 0.1),
+            'compatibility_score': random.randint(75, 95),
+            'reasons': random.sample([
+                'Prix dans votre budget',
+                'Correspond à vos critères de surface',
+                'Localisation préférée',
+                'Nombre de chambres idéal',
+                'Proche des transports',
+                'Quartier recherché',
+                'Bon rapport qualité-prix'
+            ], random.randint(2, 4))
+        }
+        recommendations.append(prop)
+    
+    # Trier par score de compatibilité
+    return sorted(recommendations, key=lambda x: x['compatibility_score'], reverse=True)
+
+def show_dashboard():
+    """Tableau de bord principal"""
+    st.markdown(f"# 👋 Bienvenue, {st.session_state.user.get('first_name', 'Utilisateur')} !")
+    
+    # Métriques principales
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric("Recherches sauvegardées", "12", "2")
+    
+    with col2:
+        st.metric("Biens en favoris", "8", "3")
+    
+    with col3:
+        st.metric("Alertes actives", "5", "1")
+    
+    with col4:
+        st.metric("Visites planifiées", "3", "1")
+    
+    # Graphique d'évolution des prix
+    st.markdown("## 📈 Évolution des prix dans vos zones de recherche")
+    
+    dates = pd.date_range(start='2024-01-01', end='2024-12-31', freq='M')
+    prices = [4500 + i*50 + random.randint(-100, 100) for i in range(len(dates))]
+    
+    fig = px.line(
+        x=dates, 
+        y=prices,
+        title="Prix moyen au m² dans vos zones de recherche",
+        labels={'x': 'Mois', 'y': 'Prix au m² (€)'}
+    )
+    fig.update_traces(line_color=COLORS['primary'])
+    st.plotly_chart(fig, use_container_width=True)
+    
+    # Alertes et notifications
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("## 🔔 Alertes récentes")
+        
+        alerts = [
+            {"type": "success", "message": "Nouveau bien correspondant à vos critères!", "time": "Il y a 2h"},
+            {"type": "info", "message": "Baisse de prix sur un bien en favori", "time": "Il y a 1 jour"},
+            {"type": "warning", "message": "Visite programmée demain à 14h", "time": "Il y a 2 jours"}
+        ]
+        
+        for alert in alerts:
+            icon = "🟢" if alert["type"] == "success" else "🔵" if alert["type"] == "info" else "🟡"
+            st.markdown(f"{icon} **{alert['message']}** - *{alert['time']}*")
+    
+    with col2:
+        st.markdown("## 📊 Vos statistiques")
+        
+        # Graphique en camembert des types de biens recherchés
+        labels = ['Appartements', 'Maisons', 'Studios']
+        values = [60, 30, 10]
+        
+        fig_pie = px.pie(
+            values=values, 
+            names=labels,
+            title="Répartition de vos recherches",
+            color_discrete_sequence=[COLORS['primary'], COLORS['secondary'], COLORS['accent']]
+        )
+        st.plotly_chart(fig_pie, use_container_width=True)
+
+# ================================
+# INTERFACE PRINCIPALE
+# ================================
+
+def main():
+    """Fonction principale de l'application"""
+    # Configuration de la page
+    st.set_page_config(
+        page_title="ImoMatch - Votre assistant immobilier IA",
+        page_icon="🏠",
+        layout="wide",
+        initial_sidebar_state="expanded"
+    )
+    
+    # Initialisation des variables de session
+    init_session_state()
+    
+    # Application du thème
+    apply_theme()
+    
+    # Interface de contrôle en haut
+    col1, col2, col3 = st.columns([3, 1, 1])
+    
+    with col2:
+        # Sélecteur de langue
+        languages = {'fr': '🇫🇷 Français', 'en': '🇬🇧 English'}
+        selected_lang = st.selectbox(
+            "",
+            options=list(languages.keys()),
+            format_func=lambda x: languages[x],
+            index=0 if st.session_state.language == 'fr' else 1,
+            key="lang_selector"
+        )
+        
+        if selected_lang != st.session_state.language:
+            st.session_state.language = selected_lang
+            st.rerun()
+    
+    with col3:
+        # Sélecteur de thème
+        theme_options = {'light': '☀️ Clair', 'dark': '🌙 Sombre'}
+        selected_theme = st.selectbox(
+            "",
+            options=list(theme_options.keys()),
+            format_func=lambda x: theme_options[x],
+            index=0 if st.session_state.theme == 'light' else 1,
+            key="theme_selector"
+        )
+        
+        if selected_theme != st.session_state.theme:
+            st.session_state.theme = selected_theme
+            st.rerun()
+    
+    # Navigation principale
+    if not st.session_state.authenticated:
+        # Pages pour utilisateurs non connectés
+        tab1, tab2 = st.tabs([get_text('welcome'), get_text('login')])
+        
+        with tab1:
+            show_landing_page()
+        
+        with tab2:
+            show_login_page()
+    
+    else:
+        # Interface pour utilisateurs connectés
+        with st.sidebar:
+            create_logo()
+            
+            # Menu de navigation
+            menu_options = [
+                get_text('dashboard'),
+                get_text('my_info'),
+                get_text('search'),
+                get_text('recommendations')
+            ]
+            
+            selected_page = st.selectbox("Navigation", menu_options)
+            
+            # Informations utilisateur
+            st.markdown("---")
+            st.markdown(f"**{st.session_state.user.get('first_name', '')} {st.session_state.user.get('last_name', '')}**")
+            st.markdown(f"Plan: **{st.session_state.user.get('plan', 'free').title()}**")
+            
+            if st.button(get_text('logout')):
+                st.session_state.authenticated = False
+                st.session_state.user = None
+                st.rerun()
+        
+        # Affichage de la page sélectionnée
+        if selected_page == get_text('dashboard'):
+            show_dashboard()
+        elif selected_page == get_text('my_info'):
+            show_my_info_page()
+        elif selected_page == get_text('search'):
+            show_search_page()
+        elif selected_page == get_text('recommendations'):
+            show_recommendations_page()
+
+if __name__ == "__main__":
+    main()
