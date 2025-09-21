@@ -1,4 +1,25 @@
-import streamlit as st
+else:
+        # Interface pour utilisateurs connectés
+        with st.sidebar:
+            create_logo_with_custom()
+            
+            # Uploader de logo personnalisé (seulement pour utilisateurs connectés)
+            create_custom_logo_uploader()
+            
+            # Menu de navigation
+            menu_options = [
+                get_text('dashboard'),
+                get_text('my_info'),
+                get_text('search'),
+                get_text('recommendations')
+            ]
+            
+            selected_page = st.selectbox("Navigation", menu_options)
+            
+            # Informations utilisateur
+            st.markdown("---")
+            st.markdown(f"**{st.session_state.user.get('first_name', '')} {st.session_state.user.get('last_name', '')}**")
+            st.markdown(f"Planimport streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -312,21 +333,113 @@ def get_text(key: str) -> str:
     return TRANSLATIONS[st.session_state.language].get(key, key)
 
 def apply_theme():
-    """Applique le thème choisi"""
+    """Applique le thème choisi avec styles améliorés"""
     if st.session_state.theme == 'dark':
-        st.markdown("""
+        st.markdown(f"""
         <style>
-        .stApp {
+        .stApp {{
             background-color: #1E1E1E;
             color: #FFFFFF;
-        }
-        .stSidebar {
+        }}
+        .stSidebar {{
             background-color: #2D2D2D;
-        }
-        .stSelectbox, .stTextInput, .stTextArea, .stNumberInput {
-            background-color: #3D3D3D;
             color: #FFFFFF;
-        }
+        }}
+        .main-header {{
+            background: linear-gradient(90deg, {COLORS['primary']}, {COLORS['secondary']});
+            color: white;
+            padding: 1.5rem;
+            border-radius: 15px;
+            margin-bottom: 2rem;
+            text-align: center;
+        }}
+        .metric-card {{
+            background: #2D2D2D;
+            color: #FFFFFF;
+            padding: 1.5rem;
+            border-radius: 15px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            border-left: 4px solid {COLORS['primary']};
+            margin: 1rem 0;
+        }}
+        .metric-card h3 {{
+            color: {COLORS['primary']};
+            font-size: 2rem;
+            margin: 0;
+            font-weight: bold;
+        }}
+        .metric-card p {{
+            color: #CCCCCC;
+            margin: 0.5rem 0 0 0;
+            font-size: 0.9rem;
+        }}
+        .plan-card {{
+            background: #2D2D2D;
+            color: #FFFFFF;
+            padding: 2rem;
+            border-radius: 15px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            text-align: center;
+            margin: 1rem 0;
+            border: 1px solid #444;
+        }}
+        .plan-card.premium {{
+            border: 2px solid {COLORS['primary']};
+            transform: scale(1.05);
+            background: linear-gradient(135deg, #2D2D2D, #3D3D3D);
+        }}
+        .plan-card h3 {{
+            color: {COLORS['primary']};
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }}
+        .plan-card h2 {{
+            color: #FFFFFF;
+            font-size: 2.5rem;
+            margin: 1rem 0;
+        }}
+        .ai-chat {{
+            background: #2D2D2D;
+            border: 1px solid #444;
+            border-radius: 15px;
+            padding: 1rem;
+            margin: 0.5rem 0;
+        }}
+        .user-message {{
+            background: {COLORS['primary']};
+            color: white;
+            padding: 1rem 1.5rem;
+            border-radius: 20px;
+            margin: 1rem 0;
+            margin-left: 20%;
+            font-weight: 500;
+        }}
+        .ai-message {{
+            background: #3D3D3D;
+            color: #FFFFFF;
+            padding: 1rem 1.5rem;
+            border-radius: 20px;
+            margin: 1rem 0;
+            margin-right: 20%;
+            border: 1px solid #555;
+        }}
+        .logo-container {{
+            text-align: center;
+            padding: 2rem 0;
+            background: linear-gradient(135deg, #1E1E1E, #2D2D2D);
+            border-radius: 15px;
+            margin-bottom: 2rem;
+        }}
+        .stSelectbox label, .stTextInput label, .stNumberInput label {{
+            color: #FFFFFF !important;
+            font-weight: 500;
+        }}
+        .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {{
+            color: #FFFFFF !important;
+        }}
+        .stMarkdown p {{
+            color: #CCCCCC !important;
+        }}
         </style>
         """, unsafe_allow_html=True)
     else:
@@ -336,71 +449,284 @@ def apply_theme():
             background-color: #FFFFFF;
             color: #333333;
         }}
+        .stSidebar {{
+            background-color: #F8F9FA;
+        }}
         .main-header {{
             background: linear-gradient(90deg, {COLORS['primary']}, {COLORS['secondary']});
             color: white;
-            padding: 1rem;
-            border-radius: 10px;
+            padding: 1.5rem;
+            border-radius: 15px;
             margin-bottom: 2rem;
+            text-align: center;
         }}
         .metric-card {{
             background: white;
-            padding: 1rem;
-            border-radius: 10px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            color: #333333;
+            padding: 1.5rem;
+            border-radius: 15px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
             border-left: 4px solid {COLORS['primary']};
+            margin: 1rem 0;
+        }}
+        .metric-card h3 {{
+            color: {COLORS['primary']};
+            font-size: 2rem;
+            margin: 0;
+            font-weight: bold;
+        }}
+        .metric-card p {{
+            color: #666666;
+            margin: 0.5rem 0 0 0;
+            font-size: 0.9rem;
         }}
         .plan-card {{
             background: white;
-            padding: 1.5rem;
-            border-radius: 10px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            color: #333333;
+            padding: 2rem;
+            border-radius: 15px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
             text-align: center;
             margin: 1rem 0;
+            border: 1px solid #E0E0E0;
         }}
         .plan-card.premium {{
             border: 2px solid {COLORS['primary']};
             transform: scale(1.05);
+            background: linear-gradient(135deg, #FFF, #FFF8F5);
+        }}
+        .plan-card h3 {{
+            color: {COLORS['primary']};
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }}
+        .plan-card h2 {{
+            color: #333333;
+            font-size: 2.5rem;
+            margin: 1rem 0;
         }}
         .ai-chat {{
-            background: #f8f9fa;
-            border-radius: 10px;
+            background: #F8F9FA;
+            border: 1px solid #E0E0E0;
+            border-radius: 15px;
             padding: 1rem;
             margin: 0.5rem 0;
         }}
         .user-message {{
             background: {COLORS['primary']};
             color: white;
-            padding: 0.5rem 1rem;
-            border-radius: 15px;
-            margin: 0.5rem 0;
+            padding: 1rem 1.5rem;
+            border-radius: 20px;
+            margin: 1rem 0;
             margin-left: 20%;
+            font-weight: 500;
         }}
         .ai-message {{
             background: white;
-            color: #333;
-            padding: 0.5rem 1rem;
-            border-radius: 15px;
-            margin: 0.5rem 0;
+            color: #333333;
+            padding: 1rem 1.5rem;
+            border-radius: 20px;
+            margin: 1rem 0;
             margin-right: 20%;
-            border: 1px solid #ddd;
+            border: 1px solid #E0E0E0;
+        }}
+        .logo-container {{
+            text-align: center;
+            padding: 2rem 0;
+            background: linear-gradient(135deg, #FFF8F5, #FFFFFF);
+            border-radius: 15px;
+            margin-bottom: 2rem;
+        }}
+        .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {{
+            color: #333333 !important;
+        }}
+        .stMarkdown p {{
+            color: #666666 !important;
         }}
         </style>
         """, unsafe_allow_html=True)
 
-def create_logo():
-    """Crée le logo ImoMatch"""
-    st.markdown(f"""
-    <div style="text-align: center; padding: 2rem 0;">
-        <div style="background: linear-gradient(45deg, {COLORS['primary']}, {COLORS['secondary']}); 
-                    width: 80px; height: 80px; border-radius: 50%; 
-                    display: inline-flex; align-items: center; justify-content: center;
-                    margin-bottom: 1rem;">
-            <span style="color: white; font-size: 2rem; font-weight: bold;">IM</span>
+def create_custom_logo_uploader():
+    """Interface pour uploader un logo personnalisé"""
+    with st.sidebar:
+        st.markdown("### 🎨 Logo personnalisé")
+        uploaded_file = st.file_uploader(
+            "Uploadez votre logo ImoMatch", 
+            type=['png', 'jpg', 'jpeg', 'svg'],
+            help="Format recommandé: PNG transparent, 400x400px"
+        )
+        
+        if uploaded_file is not None:
+            st.session_state.custom_logo = uploaded_file
+            st.success("Logo uploadé avec succès !")
+        
+        if st.button("Utiliser logo par défaut"):
+            if 'custom_logo' in st.session_state:
+                del st.session_state.custom_logo
+            st.success("Logo par défaut restauré")
+
+def create_logo_with_custom():
+    """Crée le logo avec support pour logo personnalisé"""
+    logo_color = "#FFFFFF" if st.session_state.theme == 'dark' else "#333333"
+    bg_gradient = "linear-gradient(135deg, #1E1E1E, #2D2D2D)" if st.session_state.theme == 'dark' else "linear-gradient(135deg, #FFF8F5, #FFFFFF)"
+    
+    # Vérifier s'il y a un logo personnalisé
+    if 'custom_logo' in st.session_state:
+        st.markdown(f"""
+        <div class="logo-container" style="
+            text-align: center; 
+            padding: 3rem 0;
+            background: {bg_gradient};
+            border-radius: 20px;
+            margin-bottom: 2rem;
+            border: 2px solid {COLORS['primary']};
+        ">
+        """, unsafe_allow_html=True)
+        
+        # Afficher le logo personnalisé
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            st.image(st.session_state.custom_logo, width=200)
+        
+        st.markdown(f"""
+            <h1 style="
+                color: {COLORS['primary']}; 
+                margin: 1rem 0 0 0;
+                font-size: 3.5rem;
+                font-weight: 800;
+                letter-spacing: -2px;
+                text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+                text-align: center;
+            ">ImoMatch</h1>
+            
+            <p style="
+                color: {logo_color}; 
+                margin: 0.5rem 0 0 0;
+                font-size: 1.2rem;
+                font-weight: 400;
+                opacity: 0.8;
+                text-align: center;
+            ">{get_text('subtitle')}</p>
         </div>
-        <h1 style="color: {COLORS['primary']}; margin: 0;">ImoMatch</h1>
-        <p style="color: #666; margin: 0;">{get_text('subtitle')}</p>
+        """, unsafe_allow_html=True)
+    else:
+        # Logo par défaut amélioré
+        create_logo()
+
+# Mise à jour de la fonction create_logo pour être encore plus visible
+def create_logo():
+    """Crée le logo ImoMatch avec design amélioré"""
+    logo_color = "#FFFFFF" if st.session_state.theme == 'dark' else "#333333"
+    bg_gradient = "linear-gradient(135deg, #1E1E1E, #2D2D2D)" if st.session_state.theme == 'dark' else "linear-gradient(135deg, #FFF8F5, #FFFFFF)"
+    
+    st.markdown(f"""
+    <div class="logo-container" style="
+        text-align: center; 
+        padding: 3rem 0;
+        background: {bg_gradient};
+        border-radius: 20px;
+        margin-bottom: 2rem;
+        border: 2px solid {COLORS['primary']};
+    ">
+        <!-- Logo principal ImoMatch avec animation -->
+        <div style="
+            background: linear-gradient(45deg, {COLORS['primary']}, {COLORS['secondary']}, {COLORS['accent']}); 
+            width: 140px; 
+            height: 140px; 
+            border-radius: 50%; 
+            display: inline-flex; 
+            align-items: center; 
+            justify-content: center;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 10px 30px rgba(255, 107, 53, 0.4);
+            position: relative;
+            overflow: hidden;
+            animation: pulse 2s infinite;
+            border: 3px solid white;
+        ">
+            <!-- Effet de brillance -->
+            <div style="
+                position: absolute;
+                top: -50%;
+                left: -50%;
+                width: 200%;
+                height: 200%;
+                background: linear-gradient(45deg, transparent, rgba(255,255,255,0.3), transparent);
+                animation: shine 4s infinite;
+            "></div>
+            
+            <!-- Icône stylisée -->
+            <div style="
+                color: white; 
+                font-size: 4rem; 
+                z-index: 1;
+                text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            ">🏠</div>
+        </div>
+        
+        <!-- Nom de marque avec effet gradient -->
+        <h1 style="
+            background: linear-gradient(45deg, {COLORS['primary']}, {COLORS['secondary']}, {COLORS['accent']});
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin: 0;
+            font-size: 4rem;
+            font-weight: 900;
+            letter-spacing: -3px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+            filter: drop-shadow(2px 2px 4px rgba(255, 107, 53, 0.3));
+        ">ImoMatch</h1>
+        
+        <!-- Slogan amélioré -->
+        <p style="
+            color: {logo_color}; 
+            margin: 1rem 0;
+            font-size: 1.3rem;
+            font-weight: 500;
+            opacity: 0.9;
+        ">{get_text('subtitle')}</p>
+        
+        <!-- Badges informatifs -->
+        <div style="display: flex; justify-content: center; gap: 1rem; margin-top: 1.5rem;">
+            <div style="
+                background: {COLORS['primary']};
+                color: white;
+                padding: 0.7rem 1.2rem;
+                border-radius: 25px;
+                font-size: 0.9rem;
+                font-weight: 600;
+                box-shadow: 0 4px 12px rgba(255, 107, 53, 0.3);
+            ">✨ Powered by AI</div>
+            
+            <div style="
+                background: {COLORS['success']};
+                color: white;
+                padding: 0.7rem 1.2rem;
+                border-radius: 25px;
+                font-size: 0.9rem;
+                font-weight: 600;
+                box-shadow: 0 4px 12px rgba(39, 174, 96, 0.3);
+            ">🚀 Innovation</div>
+        </div>
     </div>
+    
+    <style>
+    @keyframes shine {{
+        0% {{ transform: translateX(-100%) translateY(-100%) rotate(45deg); }}
+        100% {{ transform: translateX(100%) translateY(100%) rotate(45deg); }}
+    }}
+    
+    @keyframes pulse {{
+        0% {{ transform: scale(1); }}
+        50% {{ transform: scale(1.05); }}
+        100% {{ transform: scale(1); }}
+    }}
+    
+    .logo-container:hover div[style*="animation: pulse"] {{
+        animation: pulse 0.5s ease-in-out !important;
+    }}
+    </style>
     """, unsafe_allow_html=True)
 
 # ================================
@@ -409,12 +735,12 @@ def create_logo():
 
 def show_landing_page():
     """Page d'accueil pour les utilisateurs non connectés"""
-    create_logo()
+    create_logo_with_custom()
     
     st.markdown(f"""
     <div class="main-header">
-        <h2>{get_text('welcome')}</h2>
-        <p>{get_text('value_prop')}</p>
+        <h2 style="color: white; font-size: 2.5rem; margin: 0;">{get_text('welcome')}</h2>
+        <p style="color: white; font-size: 1.2rem; margin: 1rem 0 0 0; opacity: 0.9;">{get_text('value_prop')}</p>
     </div>
     """, unsafe_allow_html=True)
     
@@ -533,7 +859,7 @@ def show_landing_page():
 
 def show_login_page():
     """Page de connexion"""
-    create_logo()
+    create_logo_with_custom()
     
     tab1, tab2 = st.tabs([get_text('login'), get_text('register')])
     
@@ -681,27 +1007,58 @@ def show_ai_agent():
             {"role": "assistant", "content": "Bonjour ! Je suis votre assistant IA personnel. Je peux vous aider à affiner vos critères de recherche immobilière. Que souhaitez-vous savoir ou améliorer dans votre profil ?"}
         ]
     
-    # Affichage de l'historique de chat
+    # Affichage de l'historique de chat avec styles améliorés
     chat_container = st.container()
     with chat_container:
         for message in st.session_state.chat_history:
             if message["role"] == "user":
                 st.markdown(f"""
-                <div class="user-message">
-                    {message["content"]}
+                <div class="user-message" style="
+                    background: {COLORS['primary']};
+                    color: white;
+                    padding: 1rem 1.5rem;
+                    border-radius: 20px;
+                    margin: 1rem 0;
+                    margin-left: 20%;
+                    font-weight: 500;
+                    box-shadow: 0 4px 12px rgba(255, 107, 53, 0.3);
+                ">
+                    👤 {message["content"]}
                 </div>
                 """, unsafe_allow_html=True)
             else:
+                bg_color = "#3D3D3D" if st.session_state.theme == 'dark' else "white"
+                text_color = "#FFFFFF" if st.session_state.theme == 'dark' else "#333333"
+                border_color = "#555" if st.session_state.theme == 'dark' else "#E0E0E0"
+                
                 st.markdown(f"""
-                <div class="ai-message">
-                    {message["content"]}
+                <div class="ai-message" style="
+                    background: {bg_color};
+                    color: {text_color};
+                    padding: 1rem 1.5rem;
+                    border-radius: 20px;
+                    margin: 1rem 0;
+                    margin-right: 20%;
+                    border: 1px solid {border_color};
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                    font-weight: 500;
+                ">
+                    🤖 {message["content"]}
                 </div>
                 """, unsafe_allow_html=True)
     
-    # Zone de saisie pour nouveau message
-    user_input = st.text_input("Posez votre question...", key="ai_input")
+    # Zone de saisie pour nouveau message avec style amélioré
+    col1, col2 = st.columns([4, 1])
+    with col1:
+        user_input = st.text_input(
+            "Posez votre question...", 
+            key="ai_input",
+            placeholder="Ex: Comment définir mon budget optimal ?"
+        )
+    with col2:
+        send_button = st.button("📤 Envoyer", use_container_width=True)
     
-    if st.button("Envoyer") and user_input:
+    if send_button and user_input:
         # Ajouter le message utilisateur
         st.session_state.chat_history.append({"role": "user", "content": user_input})
         
@@ -711,24 +1068,56 @@ def show_ai_agent():
         
         st.rerun()
     
-    # Questions suggérées
-    st.markdown("### Questions suggérées :")
+    # Questions suggérées avec style amélioré
+    st.markdown("### 💡 Questions suggérées :")
+    
+    suggestion_style = f"""
+        background: {'#2D2D2D' if st.session_state.theme == 'dark' else '#F8F9FA'};
+        border: 1px solid {'#555' if st.session_state.theme == 'dark' else '#E0E0E0'};
+        border-radius: 10px;
+        padding: 0.7rem 1rem;
+        margin: 0.5rem 0;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        color: {'#FFFFFF' if st.session_state.theme == 'dark' else '#333333'};
+    """
+    
     col1, col2 = st.columns(2)
     
     with col1:
-        if st.button("Aidez-moi à définir mon budget"):
+        if st.button("💰 Aidez-moi à définir mon budget", use_container_width=True):
             st.session_state.chat_history.append({"role": "user", "content": "Aidez-moi à définir mon budget"})
-            ai_response = "Pour vous aider à définir votre budget, j'ai besoin de quelques informations : Quel est votre revenu mensuel net ? Avez-vous des économies pour l'apport ? Quel est votre situation familiale ?"
+            ai_response = "Pour vous aider à définir votre budget optimal, j'ai besoin de quelques informations : Quel est votre revenu mensuel net ? Avez-vous des économies pour l'apport ? Quelle est votre situation familiale ? En général, il est recommandé de ne pas dépasser 30% de vos revenus en remboursement."
             st.session_state.chat_history.append({"role": "assistant", "content": ai_response})
             st.rerun()
         
-        if st.button("Quels quartiers me recommandez-vous ?"):
+        if st.button("📍 Quels quartiers me recommandez-vous ?", use_container_width=True):
             st.session_state.chat_history.append({"role": "user", "content": "Quels quartiers me recommandez-vous ?"})
-            ai_response = "Basé sur votre profil, je peux vous recommander des quartiers. Pouvez-vous me dire : Travaillez-vous dans un lieu spécifique ? Préférez-vous le calme ou l'animation ? Avez-vous des enfants scolarisés ?"
+            ai_response = "Basé sur votre profil, je peux vous recommander des quartiers adaptés. Pour personnaliser mes recommandations, pouvez-vous me dire : Où travaillez-vous ? Préférez-vous le calme ou l'animation ? Avez-vous des enfants scolarisés ? Utilisez-vous les transports en commun ?"
             st.session_state.chat_history.append({"role": "assistant", "content": ai_response})
             st.rerun()
     
     with col2:
+        if st.button("🎯 Optimiser mes critères de recherche", use_container_width=True):
+            st.session_state.chat_history.append({"role": "user", "content": "Optimiser mes critères de recherche"})
+            prefs = st.session_state.db.get_user_preferences(st.session_state.user['id']) or {}
+            budget_info = f"{prefs.get('budget_min', 'N/A')}€ et {prefs.get('budget_max', 'N/A')}€" if prefs.get('budget_min') else "non défini"
+            ai_response = f"Analysons vos critères actuels. Votre budget est {budget_info}. Je vais examiner le marché pour optimiser vos chances de trouver le bien idéal. Voulez-vous que je vous explique les tendances actuelles du marché dans votre zone de recherche ?"
+            st.session_state.chat_history.append({"role": "assistant", "content": ai_response})
+            st.rerun()
+        
+        if st.button("📊 Analyser le marché immobilier", use_container_width=True):
+            st.session_state.chat_history.append({"role": "user", "content": "Analyser le marché immobilier"})
+            ai_response = "📈 D'après les données récentes, le marché immobilier dans votre zone de recherche présente ces tendances : prix en hausse de 3% sur l'année, délai moyen de vente de 45 jours, forte demande pour les biens avec extérieur. Souhaitez-vous des conseils personnalisés pour votre stratégie d'achat ?"
+            st.session_state.chat_history.append({"role": "assistant", "content": ai_response})
+            st.rerun()
+    
+    # Bouton pour effacer l'historique
+    if st.button("🗑️ Effacer l'historique", help="Recommencer la conversation"):
+        st.session_state.chat_history = [
+            {"role": "assistant", "content": "Bonjour ! Comment puis-je vous aider avec votre recherche immobilière aujourd'hui ?"}
+        ]
+        st.rerun()
         if st.button("Optimiser mes critères de recherche"):
             st.session_state.chat_history.append({"role": "user", "content": "Optimiser mes critères de recherche"})
             prefs = st.session_state.db.get_user_preferences(st.session_state.user['id']) or {}
@@ -1194,7 +1583,10 @@ def main():
     else:
         # Interface pour utilisateurs connectés
         with st.sidebar:
-            create_logo()
+            create_logo_with_custom()
+            
+            # Uploader de logo personnalisé (seulement pour utilisateurs connectés)
+            create_custom_logo_uploader()
             
             # Menu de navigation
             menu_options = [
@@ -1206,14 +1598,31 @@ def main():
             
             selected_page = st.selectbox("Navigation", menu_options)
             
-            # Informations utilisateur
+            # Informations utilisateur avec style amélioré
             st.markdown("---")
-            st.markdown(f"**{st.session_state.user.get('first_name', '')} {st.session_state.user.get('last_name', '')}**")
-            st.markdown(f"Plan: **{st.session_state.user.get('plan', 'free').title()}**")
+            user_info_color = "#FFFFFF" if st.session_state.theme == 'dark' else "#333333"
+            st.markdown(f"""
+            <div style="
+                background: {'#2D2D2D' if st.session_state.theme == 'dark' else '#F8F9FA'};
+                padding: 1rem;
+                border-radius: 10px;
+                margin: 1rem 0;
+                border-left: 4px solid {COLORS['primary']};
+            ">
+                <p style="color: {user_info_color}; font-weight: 600; margin: 0;">
+                    👤 {st.session_state.user.get('first_name', '')} {st.session_state.user.get('last_name', '')}
+                </p>
+                <p style="color: {COLORS['primary']}; font-weight: 500; margin: 0.5rem 0 0 0;">
+                    📋 Plan: {st.session_state.user.get('plan', 'free').title()}
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
             
-            if st.button(get_text('logout')):
+            if st.button("🚪 " + get_text('logout'), use_container_width=True):
                 st.session_state.authenticated = False
                 st.session_state.user = None
+                if 'custom_logo' in st.session_state:
+                    del st.session_state.custom_logo
                 st.rerun()
         
         # Affichage de la page sélectionnée
