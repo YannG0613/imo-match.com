@@ -1,616 +1,291 @@
 import streamlit as st
-import sqlite3
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
+import sqlite3
 import hashlib
 import json
-import time
 from typing import Dict, List, Optional, Tuple
+import openai
 import folium
 from streamlit_folium import st_folium
-import numpy as np
-from dataclasses import dataclass
-import re
 
-# Configuration de la page
-st.set_page_config(
-    page_title="ImoMatch - Trouvez votre bien immobilier idéal",
-    page_icon="🏠",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+# ================================
+# CONFIGURATION ET CONSTANTES
+# ================================
 
-# Classes et structures de données
-@dataclass
-class UserProfile:
-    user_id: str
-    email: str
-    nom: str
-    prenom: str
-    telephone: str
-    profession: str
-    situation_familiale: str
-    revenus: float
-    apport: float
-    credits_en_cours: float
-    localisation_actuelle: str
-    localisation_souhaitee: str
-    type_bien: str
-    budget_min: float
-    budget_max: float
-    surface_min: float
-    nb_pieces_min: int
-    criteres_specifiques: Dict
-    date_creation: datetime
-    plan: str = "Free"
-    plan_expiration: Optional[datetime] = None
-
-@dataclass
-class Property:
-    id: str
-    titre: str
-    prix: float
-    surface: float
-    nb_pieces: int
-    localisation: str
-    lat: float
-    lng: float
-    type_bien: str
-    description: str
-    caracteristiques: Dict
-    photos: List[str]
-    date_ajout: datetime
-
-# Configuration des thèmes
-THEMES = {
-    "light": {
-        "background_color": "#FFFFFF",
-        "text_color": "#000000",
-        "primary_color": "#FF6B35",
-        "secondary_color": "#F7931E",
-        "accent_color": "#2E86AB",
-        "card_background": "#F8F9FA",
-        "sidebar_background": "#FFFFFF"
-    },
-    "dark": {
-        "background_color": "#0E1117",
-        "text_color": "#FAFAFA",
-        "primary_color": "#FF6B35",
-        "secondary_color": "#F7931E",
-        "accent_color": "#64B5F6",
-        "card_background": "#1E1E1E",
-        "sidebar_background": "#262730"
-    }
+COLORS = {
+    'primary': '#FF6B35',      # Orange principal
+    'secondary': '#F7931E',    # Orange secondaire
+    'accent': '#FFB84D',       # Orange clair
+    'dark': '#2C3E50',         # Bleu foncé
+    'light': '#ECF0F1',        # Gris clair
+    'success': '#27AE60',      # Vert
+    'danger': '#E74C3C',       # Rouge
+    'warning': '#F39C12',      # Orange foncé
+    'info': '#3498DB'          # Bleu
 }
 
-# Configuration des langues
 TRANSLATIONS = {
-    "fr": {
-        "app_title": "ImoMatch - Trouvez votre bien immobilier idéal",
-        "welcome": "Bienvenue",
-        "login": "Connexion",
-        "register": "S'inscrire",
-        "email": "Email",
-        "password": "Mot de passe",
-        "name": "Nom",
-        "firstname": "Prénom",
-        "phone": "Téléphone",
-        "profession": "Profession",
-        "family_situation": "Situation familiale",
-        "income": "Revenus mensuels (€)",
-        "contribution": "Apport personnel (€)",
-        "current_credits": "Crédits en cours (€)",
-        "current_location": "Localisation actuelle",
-        "desired_location": "Localisation souhaitée",
-        "property_type": "Type de bien",
-        "min_budget": "Budget minimum (€)",
-        "max_budget": "Budget maximum (€)",
-        "min_surface": "Surface minimum (m²)",
-        "min_rooms": "Nombre de pièces minimum",
-        "dashboard": "Tableau de bord",
-        "my_info": "Mes informations",
-        "recommendations": "Recommandations",
-        "advanced_search": "Recherche avancée",
-        "agent_ai": "Agent AI",
-        "logout": "Déconnexion",
-        "free_plan": "Plan Gratuit",
-        "premium_plan": "Plan Premium",
-        "professional_plan": "Plan Professionnel",
-        "start_trial": "Essai 14 jours gratuit",
-        "value_proposition": "La solution IA qui révolutionne votre recherche immobilière",
-        "contact_info": "Informations de contact"
+    'fr': {
+        'title': 'ImoMatch - Trouvez votre bien immobilier idéal',
+        'subtitle': 'Intelligence artificielle au service de votre recherche immobilière',
+        'login': 'Connexion',
+        'register': 'S\'inscrire',
+        'dashboard': 'Tableau de bord',
+        'my_info': 'Mes informations',
+        'search': 'Recherche',
+        'recommendations': 'Recommandations',
+        'agent_ai': 'Agent IA',
+        'logout': 'Déconnexion',
+        'welcome': 'Bienvenue sur ImoMatch',
+        'value_prop': 'Notre plateforme utilise l\'intelligence artificielle pour vous aider à trouver le bien immobilier parfait selon vos critères personnalisés.',
+        'free_plan': 'Gratuit',
+        'premium_plan': 'Premium',
+        'pro_plan': 'Professionnel',
+        'statistics': 'Statistiques',
+        'partners': 'Partenaires',
+        'contact': 'Contact'
     },
-    "en": {
-        "app_title": "ImoMatch - Find your ideal property",
-        "welcome": "Welcome",
-        "login": "Login",
-        "register": "Register",
-        "email": "Email",
-        "password": "Password",
-        "name": "Last Name",
-        "firstname": "First Name",
-        "phone": "Phone",
-        "profession": "Profession",
-        "family_situation": "Family Situation",
-        "income": "Monthly Income (€)",
-        "contribution": "Personal Contribution (€)",
-        "current_credits": "Current Credits (€)",
-        "current_location": "Current Location",
-        "desired_location": "Desired Location",
-        "property_type": "Property Type",
-        "min_budget": "Minimum Budget (€)",
-        "max_budget": "Maximum Budget (€)",
-        "min_surface": "Minimum Surface (m²)",
-        "min_rooms": "Minimum Number of Rooms",
-        "dashboard": "Dashboard",
-        "my_info": "My Information",
-        "recommendations": "Recommendations",
-        "advanced_search": "Advanced Search",
-        "agent_ai": "AI Agent",
-        "logout": "Logout",
-        "free_plan": "Free Plan",
-        "premium_plan": "Premium Plan",
-        "professional_plan": "Professional Plan",
-        "start_trial": "Start 14-day free trial",
-        "value_proposition": "The AI solution that revolutionizes your real estate search",
-        "contact_info": "Contact Information"
+    'en': {
+        'title': 'ImoMatch - Find your ideal property',
+        'subtitle': 'Artificial intelligence for your real estate search',
+        'login': 'Login',
+        'register': 'Sign Up',
+        'dashboard': 'Dashboard',
+        'my_info': 'My Information',
+        'search': 'Search',
+        'recommendations': 'Recommendations',
+        'agent_ai': 'AI Agent',
+        'logout': 'Logout',
+        'welcome': 'Welcome to ImoMatch',
+        'value_prop': 'Our platform uses artificial intelligence to help you find the perfect property according to your personalized criteria.',
+        'free_plan': 'Free',
+        'premium_plan': 'Premium',
+        'pro_plan': 'Professional',
+        'statistics': 'Statistics',
+        'partners': 'Partners',
+        'contact': 'Contact'
     }
 }
+
+# ================================
+# CLASSE DE GESTION DE BASE DE DONNÉES
+# ================================
 
 class DatabaseManager:
-    """Gestionnaire de base de données SQLite"""
-    
     def __init__(self, db_path: str = "imomatch.db"):
         self.db_path = db_path
         self.init_database()
     
-    def get_connection(self):
-        return sqlite3.connect(self.db_path, check_same_thread=False)
-    
     def init_database(self):
-        """Initialise les tables de la base de données"""
-        conn = self.get_connection()
+        """Initialise la base de données avec les tables nécessaires"""
+        conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
-        # Table utilisateurs
+        # Table des utilisateurs
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS users (
-                user_id TEXT PRIMARY KEY,
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
                 email TEXT UNIQUE NOT NULL,
                 password_hash TEXT NOT NULL,
-                nom TEXT,
-                prenom TEXT,
-                telephone TEXT,
+                first_name TEXT,
+                last_name TEXT,
+                phone TEXT,
+                age INTEGER,
                 profession TEXT,
-                situation_familiale TEXT,
-                revenus REAL,
-                apport REAL,
-                credits_en_cours REAL,
-                localisation_actuelle TEXT,
-                localisation_souhaitee TEXT,
-                type_bien TEXT,
-                budget_min REAL,
-                budget_max REAL,
-                surface_min REAL,
-                nb_pieces_min INTEGER,
-                criteres_specifiques TEXT,
-                plan TEXT DEFAULT 'Free',
-                plan_expiration TEXT,
-                date_creation TEXT,
-                preferences TEXT
+                plan TEXT DEFAULT 'free',
+                trial_end_date TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
         
-        # Table propriétés
+        # Table des préférences utilisateur
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS user_preferences (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                budget_min INTEGER,
+                budget_max INTEGER,
+                property_type TEXT,
+                bedrooms INTEGER,
+                bathrooms INTEGER,
+                surface_min INTEGER,
+                location TEXT,
+                criteria JSON,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users (id)
+            )
+        ''')
+        
+        # Table des biens immobiliers
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS properties (
-                id TEXT PRIMARY KEY,
-                titre TEXT,
-                prix REAL,
-                surface REAL,
-                nb_pieces INTEGER,
-                localisation TEXT,
-                lat REAL,
-                lng REAL,
-                type_bien TEXT,
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                price INTEGER NOT NULL,
+                property_type TEXT,
+                bedrooms INTEGER,
+                bathrooms INTEGER,
+                surface INTEGER,
+                location TEXT,
+                latitude REAL,
+                longitude REAL,
                 description TEXT,
-                caracteristiques TEXT,
-                photos TEXT,
-                date_ajout TEXT
-            )
-        ''')
-        
-        # Table sessions
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS sessions (
-                session_id TEXT PRIMARY KEY,
-                user_id TEXT,
-                created_at TEXT,
-                expires_at TEXT,
-                FOREIGN KEY (user_id) REFERENCES users (user_id)
+                features JSON,
+                images JSON,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
         
         conn.commit()
         conn.close()
-        
-        # Insérer des données de test si la base est vide
-        self.insert_sample_data()
     
-    def insert_sample_data(self):
-        """Insère des données d'exemple"""
-        conn = self.get_connection()
-        cursor = conn.cursor()
-        
-        # Vérifier si des propriétés existent déjà
-        cursor.execute("SELECT COUNT(*) FROM properties")
-        if cursor.fetchone()[0] == 0:
-            sample_properties = [
-                ('prop_1', 'Appartement T3 Centre Ville', 250000, 65, 3, 'Paris 11ème', 48.8566, 2.3522, 'Appartement', 
-                 'Bel appartement rénové en centre ville', '{"balcon": true, "parking": false, "ascenseur": true}', 
-                 '[]', datetime.now().isoformat()),
-                ('prop_2', 'Maison avec Jardin', 380000, 95, 4, 'Boulogne-Billancourt', 48.8414, 2.2403, 'Maison', 
-                 'Maison familiale avec jardin', '{"jardin": true, "garage": true, "cave": true}', 
-                 '[]', datetime.now().isoformat()),
-                ('prop_3', 'Studio Moderne', 180000, 25, 1, 'Lyon 2ème', 45.7640, 4.8357, 'Studio', 
-                 'Studio moderne entièrement équipé', '{"meuble": true, "cuisine_equipee": true}', 
-                 '[]', datetime.now().isoformat())
-            ]
-            
-            cursor.executemany('''
-                INSERT INTO properties (id, titre, prix, surface, nb_pieces, localisation, lat, lng, 
-                                      type_bien, description, caracteristiques, photos, date_ajout)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', sample_properties)
-            
-            conn.commit()
-        
-        conn.close()
-    
-    def create_user(self, user_data: Dict) -> bool:
+    def create_user(self, email: str, password: str, **kwargs) -> Optional[int]:
         """Crée un nouvel utilisateur"""
-        try:
-            conn = self.get_connection()
-            cursor = conn.cursor()
-            
-            cursor.execute('''
-                INSERT INTO users (user_id, email, password_hash, nom, prenom, telephone,
-                                 profession, situation_familiale, revenus, apport, credits_en_cours,
-                                 localisation_actuelle, localisation_souhaitee, type_bien,
-                                 budget_min, budget_max, surface_min, nb_pieces_min,
-                                 criteres_specifiques, plan, date_creation)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (
-                user_data['user_id'], user_data['email'], user_data['password_hash'],
-                user_data.get('nom', ''), user_data.get('prenom', ''), user_data.get('telephone', ''),
-                user_data.get('profession', ''), user_data.get('situation_familiale', ''),
-                user_data.get('revenus', 0), user_data.get('apport', 0), user_data.get('credits_en_cours', 0),
-                user_data.get('localisation_actuelle', ''), user_data.get('localisation_souhaitee', ''),
-                user_data.get('type_bien', ''), user_data.get('budget_min', 0), user_data.get('budget_max', 0),
-                user_data.get('surface_min', 0), user_data.get('nb_pieces_min', 1),
-                json.dumps(user_data.get('criteres_specifiques', {})), user_data.get('plan', 'Free'),
-                datetime.now().isoformat()
-            ))
-            
-            conn.commit()
-            conn.close()
-            return True
-        except Exception as e:
-            st.error(f"Erreur lors de la création de l'utilisateur: {e}")
-            return False
-    
-    def get_user_by_email(self, email: str) -> Optional[Dict]:
-        """Récupère un utilisateur par email"""
-        conn = self.get_connection()
+        conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
-        cursor.execute("SELECT * FROM users WHERE email = ?", (email,))
-        row = cursor.fetchone()
+        password_hash = hashlib.sha256(password.encode()).hexdigest()
         
-        if row:
-            columns = [description[0] for description in cursor.description]
-            user_dict = dict(zip(columns, row))
+        try:
+            cursor.execute('''
+                INSERT INTO users (email, password_hash, first_name, last_name, phone, age, profession, plan)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                email, password_hash, 
+                kwargs.get('first_name', ''),
+                kwargs.get('last_name', ''),
+                kwargs.get('phone', ''),
+                kwargs.get('age'),
+                kwargs.get('profession', ''),
+                kwargs.get('plan', 'free')
+            ))
+            user_id = cursor.lastrowid
+            conn.commit()
+            return user_id
+        except sqlite3.IntegrityError:
+            return None
+        finally:
             conn.close()
-            return user_dict
+    
+    def authenticate_user(self, email: str, password: str) -> Optional[Dict]:
+        """Authentifie un utilisateur"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
         
+        password_hash = hashlib.sha256(password.encode()).hexdigest()
+        
+        cursor.execute('''
+            SELECT * FROM users WHERE email = ? AND password_hash = ?
+        ''', (email, password_hash))
+        
+        user = cursor.fetchone()
         conn.close()
+        
+        if user:
+            columns = ['id', 'email', 'password_hash', 'first_name', 'last_name', 
+                      'phone', 'age', 'profession', 'plan', 'trial_end_date', 
+                      'created_at', 'updated_at']
+            return dict(zip(columns, user))
         return None
     
-    def update_user(self, user_id: str, user_data: Dict) -> bool:
-        """Met à jour les informations d'un utilisateur"""
-        try:
-            conn = self.get_connection()
-            cursor = conn.cursor()
-            
-            set_clause = ", ".join([f"{key} = ?" for key in user_data.keys()])
-            values = list(user_data.values()) + [user_id]
-            
-            cursor.execute(f"UPDATE users SET {set_clause} WHERE user_id = ?", values)
-            
-            conn.commit()
-            conn.close()
-            return True
-        except Exception as e:
-            st.error(f"Erreur lors de la mise à jour: {e}")
-            return False
-    
-    def get_properties(self, filters: Dict = None) -> List[Dict]:
-        """Récupère les propriétés avec filtres optionnels"""
-        conn = self.get_connection()
+    def get_user_preferences(self, user_id: int) -> Optional[Dict]:
+        """Récupère les préférences d'un utilisateur"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
         
-        query = "SELECT * FROM properties"
-        params = []
+        cursor.execute('''
+            SELECT * FROM user_preferences WHERE user_id = ? ORDER BY updated_at DESC LIMIT 1
+        ''', (user_id,))
         
-        if filters:
-            conditions = []
-            if 'prix_min' in filters and filters['prix_min']:
-                conditions.append("prix >= ?")
-                params.append(filters['prix_min'])
-            if 'prix_max' in filters and filters['prix_max']:
-                conditions.append("prix <= ?")
-                params.append(filters['prix_max'])
-            if 'surface_min' in filters and filters['surface_min']:
-                conditions.append("surface >= ?")
-                params.append(filters['surface_min'])
-            if 'surface_max' in filters and filters['surface_max']:
-                conditions.append("surface <= ?")
-                params.append(filters['surface_max'])
-            if 'nb_pieces' in filters and filters['nb_pieces']:
-                conditions.append("nb_pieces >= ?")
-                params.append(filters['nb_pieces'])
-            if 'type_bien' in filters and filters['type_bien']:
-                conditions.append("type_bien = ?")
-                params.append(filters['type_bien'])
-            if 'localisation' in filters and filters['localisation']:
-                conditions.append("localisation LIKE ?")
-                params.append(f"%{filters['localisation']}%")
-            
-            if conditions:
-                query += " WHERE " + " AND ".join(conditions)
-        
-        df = pd.read_sql_query(query, conn, params=params)
+        prefs = cursor.fetchone()
         conn.close()
         
-        return df.to_dict('records')
-
-class ThemeManager:
-    """Gestionnaire des thèmes"""
+        if prefs:
+            columns = ['id', 'user_id', 'budget_min', 'budget_max', 'property_type',
+                      'bedrooms', 'bathrooms', 'surface_min', 'location', 'criteria',
+                      'created_at', 'updated_at']
+            result = dict(zip(columns, prefs))
+            if result['criteria']:
+                result['criteria'] = json.loads(result['criteria'])
+            return result
+        return None
     
-    @staticmethod
-    def apply_theme(theme_name: str):
-        """Applique un thème à l'interface"""
-        theme = THEMES.get(theme_name, THEMES["light"])
+    def save_user_preferences(self, user_id: int, preferences: Dict):
+        """Sauvegarde les préférences utilisateur"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
         
-        st.markdown(f"""
-        <style>
-            .stApp {{
-                background-color: {theme['background_color']};
-                color: {theme['text_color']};
-            }}
-            
-            .main-header {{
-                background: linear-gradient(90deg, {theme['primary_color']}, {theme['secondary_color']});
-                padding: 1rem;
-                border-radius: 10px;
-                margin-bottom: 2rem;
-                text-align: center;
-            }}
-            
-            .main-header h1 {{
-                color: white !important;
-                margin: 0;
-                font-size: 2.5rem;
-                font-weight: bold;
-            }}
-            
-            .value-card {{
-                background: {theme['card_background']};
-                padding: 1.5rem;
-                border-radius: 15px;
-                margin: 1rem 0;
-                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-                border-left: 4px solid {theme['primary_color']};
-            }}
-            
-            .metric-card {{
-                background: {theme['card_background']};
-                padding: 1rem;
-                border-radius: 10px;
-                text-align: center;
-                border: 1px solid {theme['primary_color']};
-            }}
-            
-            .plan-card {{
-                background: {theme['card_background']};
-                border: 2px solid {theme['primary_color']};
-                border-radius: 15px;
-                padding: 1.5rem;
-                margin: 1rem;
-                text-align: center;
-                transition: transform 0.3s ease;
-            }}
-            
-            .plan-card:hover {{
-                transform: translateY(-5px);
-                box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
-            }}
-            
-            .sidebar .sidebar-content {{
-                background-color: {theme['sidebar_background']};
-            }}
-            
-            .stButton > button {{
-                background: linear-gradient(90deg, {theme['primary_color']}, {theme['secondary_color']});
-                color: white;
-                border: none;
-                border-radius: 25px;
-                padding: 0.5rem 1.5rem;
-                font-weight: bold;
-                transition: all 0.3s ease;
-            }}
-            
-            .stButton > button:hover {{
-                transform: translateY(-2px);
-                box-shadow: 0 4px 12px rgba(255, 107, 53, 0.4);
-            }}
-            
-            .property-card {{
-                background: {theme['card_background']};
-                border-radius: 15px;
-                padding: 1rem;
-                margin: 1rem 0;
-                border-left: 4px solid {theme['primary_color']};
-                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            }}
-            
-            .agent-response {{
-                background: linear-gradient(135deg, {theme['primary_color']}33, {theme['secondary_color']}33);
-                border-radius: 15px;
-                padding: 1rem;
-                margin: 1rem 0;
-                border-left: 4px solid {theme['primary_color']};
-                color: {theme['text_color']} !important;
-            }}
-            
-            .logo-container {{
-                text-align: center;
-                padding: 2rem 0;
-            }}
-            
-            .logo-text {{
-                font-size: 3rem;
-                font-weight: bold;
-                background: linear-gradient(90deg, {theme['primary_color']}, {theme['secondary_color']});
-                -webkit-background-clip: text;
-                -webkit-text-fill-color: transparent;
-                background-clip: text;
-            }}
-        </style>
-        """, unsafe_allow_html=True)
-
-class AuthManager:
-    """Gestionnaire d'authentification"""
+        cursor.execute('''
+            INSERT INTO user_preferences 
+            (user_id, budget_min, budget_max, property_type, bedrooms, bathrooms, 
+             surface_min, location, criteria, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        ''', (
+            user_id,
+            preferences.get('budget_min'),
+            preferences.get('budget_max'),
+            preferences.get('property_type'),
+            preferences.get('bedrooms'),
+            preferences.get('bathrooms'),
+            preferences.get('surface_min'),
+            preferences.get('location'),
+            json.dumps(preferences.get('criteria', {}))
+        ))
+        
+        conn.commit()
+        conn.close()
     
-    def __init__(self, db_manager: DatabaseManager):
-        self.db = db_manager
-    
-    @staticmethod
-    def hash_password(password: str) -> str:
-        """Hash un mot de passe"""
-        return hashlib.sha256(password.encode()).hexdigest()
-    
-    def register_user(self, user_data: Dict) -> Tuple[bool, str]:
-        """Enregistre un nouvel utilisateur"""
-        if self.db.get_user_by_email(user_data['email']):
-            return False, "Un compte avec cet email existe déjà"
+    def search_properties(self, filters: Dict) -> List[Dict]:
+        """Recherche des biens selon des filtres"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
         
-        user_data['user_id'] = f"user_{int(time.time())}"
-        user_data['password_hash'] = self.hash_password(user_data['password'])
-        del user_data['password']  # Supprimer le mot de passe en clair
+        query = "SELECT * FROM properties WHERE 1=1"
+        params = []
         
-        if self.db.create_user(user_data):
-            return True, "Compte créé avec succès"
-        else:
-            return False, "Erreur lors de la création du compte"
-    
-    def login_user(self, email: str, password: str) -> Tuple[bool, Optional[Dict]]:
-        """Connecte un utilisateur"""
-        user = self.db.get_user_by_email(email)
-        if user and user['password_hash'] == self.hash_password(password):
-            return True, user
-        return False, None
-
-class AIAgent:
-    """Agent IA pour enrichir les informations utilisateur"""
-    
-    @staticmethod
-    def get_completion_suggestions(user_profile: Dict, missing_fields: List[str]) -> List[str]:
-        """Génère des suggestions pour compléter le profil"""
-        suggestions = []
+        if filters.get('budget_min'):
+            query += " AND price >= ?"
+            params.append(filters['budget_min'])
         
-        if 'profession' in missing_fields:
-            suggestions.append("Quelle est votre profession actuelle ? Cela nous aide à mieux évaluer votre capacité d'emprunt.")
+        if filters.get('budget_max'):
+            query += " AND price <= ?"
+            params.append(filters['budget_max'])
         
-        if 'revenus' in missing_fields:
-            suggestions.append("Quels sont vos revenus mensuels nets ? Cette information est cruciale pour déterminer votre budget.")
+        if filters.get('property_type'):
+            query += " AND property_type = ?"
+            params.append(filters['property_type'])
         
-        if 'apport' in missing_fields:
-            suggestions.append("Quel apport personnel pouvez-vous mobiliser pour votre projet immobilier ?")
+        if filters.get('location'):
+            query += " AND location LIKE ?"
+            params.append(f"%{filters['location']}%")
         
-        if 'localisation_souhaitee' in missing_fields:
-            suggestions.append("Dans quelle zone géographique souhaitez-vous rechercher ? Précisez la ville ou l'arrondissement.")
+        cursor.execute(query, params)
+        properties = cursor.fetchall()
+        conn.close()
         
-        if 'type_bien' in missing_fields:
-            suggestions.append("Quel type de bien recherchez-vous ? Appartement, maison, studio... ?")
+        columns = ['id', 'title', 'price', 'property_type', 'bedrooms', 'bathrooms',
+                  'surface', 'location', 'latitude', 'longitude', 'description',
+                  'features', 'images', 'created_at']
         
-        return suggestions
-    
-    @staticmethod
-    def analyze_profile_completion(user_profile: Dict) -> Dict:
-        """Analyse le niveau de complétude du profil"""
-        required_fields = ['profession', 'revenus', 'apport', 'localisation_souhaitee', 'type_bien', 'budget_max']
-        completed_fields = [field for field in required_fields if user_profile.get(field)]
-        completion_rate = len(completed_fields) / len(required_fields) * 100
-        
-        missing_fields = [field for field in required_fields if not user_profile.get(field)]
-        
-        return {
-            'completion_rate': completion_rate,
-            'missing_fields': missing_fields,
-            'completed_fields': completed_fields
-        }
-    
-    @staticmethod
-    def generate_recommendations(user_profile: Dict, properties: List[Dict]) -> List[Dict]:
-        """Génère des recommandations basées sur le profil utilisateur"""
-        if not user_profile.get('budget_max') or not properties:
-            return []
-        
-        scored_properties = []
+        result = []
         for prop in properties:
-            score = 0
-            reasons = []
-            
-            # Score basé sur le budget
-            if prop['prix'] <= user_profile.get('budget_max', 0):
-                score += 30
-                reasons.append("Dans votre budget")
-            elif prop['prix'] <= user_profile.get('budget_max', 0) * 1.1:
-                score += 15
-                reasons.append("Légèrement au-dessus du budget")
-            
-            # Score basé sur le type de bien
-            if prop['type_bien'] == user_profile.get('type_bien'):
-                score += 25
-                reasons.append("Correspond à votre type de bien recherché")
-            
-            # Score basé sur la surface
-            if prop['surface'] >= user_profile.get('surface_min', 0):
-                score += 20
-                reasons.append("Surface suffisante")
-            
-            # Score basé sur le nombre de pièces
-            if prop['nb_pieces'] >= user_profile.get('nb_pieces_min', 1):
-                score += 15
-                reasons.append("Nombre de pièces adapté")
-            
-            # Score basé sur la localisation
-            if user_profile.get('localisation_souhaitee') and user_profile['localisation_souhaitee'].lower() in prop['localisation'].lower():
-                score += 30
-                reasons.append("Localisation souhaitée")
-            
-            if score > 0:
-                scored_properties.append({
-                    **prop,
-                    'match_score': score,
-                    'match_reasons': reasons
-                })
+            prop_dict = dict(zip(columns, prop))
+            if prop_dict['features']:
+                prop_dict['features'] = json.loads(prop_dict['features'])
+            if prop_dict['images']:
+                prop_dict['images'] = json.loads(prop_dict['images'])
+            result.append(prop_dict)
         
-        # Trier par score décroissant
-        scored_properties.sort(key=lambda x: x['match_score'], reverse=True)
-        return scored_properties[:10]  # Top 10
+        return result
+
+# ================================
+# FONCTIONS UTILITAIRES
+# ================================
 
 def init_session_state():
     """Initialise les variables de session"""
@@ -618,514 +293,435 @@ def init_session_state():
         st.session_state.authenticated = False
     if 'user' not in st.session_state:
         st.session_state.user = None
-    if 'theme' not in st.session_state:
-        st.session_state.theme = 'light'
     if 'language' not in st.session_state:
         st.session_state.language = 'fr'
-    if 'page' not in st.session_state:
-        st.session_state.page = 'home'
+    if 'theme' not in st.session_state:
+        st.session_state.theme = 'light'
+    if 'db' not in st.session_state:
+        st.session_state.db = DatabaseManager()
 
 def get_text(key: str) -> str:
     """Récupère le texte traduit"""
     return TRANSLATIONS[st.session_state.language].get(key, key)
 
-def render_header():
-    """Affiche l'en-tête de l'application"""
-    col1, col2, col3 = st.columns([1, 2, 1])
-    
-    with col1:
-        if st.button("🌓", help="Changer de thème"):
-            st.session_state.theme = 'dark' if st.session_state.theme == 'light' else 'light'
-            st.rerun()
-    
-    with col2:
+def apply_theme():
+    """Applique le thème choisi"""
+    if st.session_state.theme == 'dark':
         st.markdown("""
-        <div class="logo-container">
-            <div class="logo-text">🏠 ImoMatch</div>
-        </div>
+        <style>
+        .stApp {
+            background-color: #1E1E1E;
+            color: #FFFFFF;
+        }
+        .stSidebar {
+            background-color: #2D2D2D;
+        }
+        .stSelectbox, .stTextInput, .stTextArea, .stNumberInput {
+            background-color: #3D3D3D;
+            color: #FFFFFF;
+        }
+        </style>
         """, unsafe_allow_html=True)
-    
-    with col3:
-        language = st.selectbox("🌐", ["fr", "en"], 
-                               index=0 if st.session_state.language == 'fr' else 1,
-                               key="language_selector")
-        if language != st.session_state.language:
-            st.session_state.language = language
-            st.rerun()
+    else:
+        st.markdown(f"""
+        <style>
+        .stApp {{
+            background-color: #FFFFFF;
+            color: #333333;
+        }}
+        .main-header {{
+            background: linear-gradient(90deg, {COLORS['primary']}, {COLORS['secondary']});
+            color: white;
+            padding: 1rem;
+            border-radius: 10px;
+            margin-bottom: 2rem;
+        }}
+        .metric-card {{
+            background: white;
+            padding: 1rem;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border-left: 4px solid {COLORS['primary']};
+        }}
+        .plan-card {{
+            background: white;
+            padding: 1.5rem;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            text-align: center;
+            margin: 1rem 0;
+        }}
+        .plan-card.premium {{
+            border: 2px solid {COLORS['primary']};
+            transform: scale(1.05);
+        }}
+        .ai-chat {{
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 1rem;
+            margin: 0.5rem 0;
+        }}
+        .user-message {{
+            background: {COLORS['primary']};
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 15px;
+            margin: 0.5rem 0;
+            margin-left: 20%;
+        }}
+        .ai-message {{
+            background: white;
+            color: #333;
+            padding: 0.5rem 1rem;
+            border-radius: 15px;
+            margin: 0.5rem 0;
+            margin-right: 20%;
+            border: 1px solid #ddd;
+        }}
+        </style>
+        """, unsafe_allow_html=True)
 
-def render_home_page(db_manager, auth_manager):
-    """Affiche la page d'accueil"""
-    render_header()
+def create_logo():
+    """Crée le logo ImoMatch"""
+    st.markdown(f"""
+    <div style="text-align: center; padding: 2rem 0;">
+        <div style="background: linear-gradient(45deg, {COLORS['primary']}, {COLORS['secondary']}); 
+                    width: 80px; height: 80px; border-radius: 50%; 
+                    display: inline-flex; align-items: center; justify-content: center;
+                    margin-bottom: 1rem;">
+            <span style="color: white; font-size: 2rem; font-weight: bold;">IM</span>
+        </div>
+        <h1 style="color: {COLORS['primary']}; margin: 0;">ImoMatch</h1>
+        <p style="color: #666; margin: 0;">{get_text('subtitle')}</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+# ================================
+# PAGES DE L'APPLICATION
+# ================================
+
+def show_landing_page():
+    """Page d'accueil pour les utilisateurs non connectés"""
+    create_logo()
     
-    # Proposition de valeur
     st.markdown(f"""
     <div class="main-header">
-        <h1>{get_text('value_proposition')}</h1>
+        <h2>{get_text('welcome')}</h2>
+        <p>{get_text('value_prop')}</p>
     </div>
     """, unsafe_allow_html=True)
     
-    # Description des fonctionnalités
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        st.markdown("""
-        <div class="value-card">
-            <h3>🤖 Intelligence Artificielle</h3>
-            <p>Notre IA analyse vos critères et trouve les biens qui vous correspondent parfaitement.</p>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col2:
-        st.markdown("""
-        <div class="value-card">
-            <h3>🎯 Recherche Personnalisée</h3>
-            <p>Algorithmes avancés pour des recommandations sur mesure selon votre profil.</p>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col3:
-        st.markdown("""
-        <div class="value-card">
-            <h3>📊 Analyse Complète</h3>
-            <p>Évaluation détaillée de votre capacité d'emprunt et conseils personnalisés.</p>
-        </div>
-        """, unsafe_allow_html=True)
-    
     # Statistiques
-    st.subheader("📈 Nos Statistiques")
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
         st.markdown("""
         <div class="metric-card">
-            <h2 style="color: #FF6B35;">10,000+</h2>
-            <p>Biens référencés</p>
+            <h3>10,000+</h3>
+            <p>Biens analysés</p>
         </div>
         """, unsafe_allow_html=True)
     
     with col2:
         st.markdown("""
         <div class="metric-card">
-            <h2 style="color: #FF6B35;">5,000+</h2>
-            <p>Utilisateurs satisfaits</p>
+            <h3>95%</h3>
+            <p>Satisfaction client</p>
         </div>
         """, unsafe_allow_html=True)
     
     with col3:
         st.markdown("""
         <div class="metric-card">
-            <h2 style="color: #FF6B35;">95%</h2>
-            <p>Taux de satisfaction</p>
+            <h3>5,000+</h3>
+            <p>Utilisateurs actifs</p>
         </div>
         """, unsafe_allow_html=True)
     
     with col4:
         st.markdown("""
         <div class="metric-card">
-            <h2 style="color: #FF6B35;">24h</h2>
-            <p>Réponse moyenne</p>
+            <h3>24/7</h3>
+            <p>Support IA</p>
         </div>
         """, unsafe_allow_html=True)
     
     # Plans tarifaires
-    st.subheader("💼 Choisissez votre plan")
+    st.markdown("## Nos offres")
     
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        st.markdown("""
+        st.markdown(f"""
         <div class="plan-card">
-            <h3>🆓 Plan Gratuit</h3>
+            <h3>{get_text('free_plan')}</h3>
             <h2>0€</h2>
             <ul style="text-align: left;">
-                <li>5 recherches par mois</li>
-                <li>Recommandations de base</li>
-                <li>Support par email</li>
+                <li>5 recherches/mois</li>
+                <li>Support de base</li>
+                <li>Accès limité à l'IA</li>
             </ul>
+            <button style="background: {COLORS['primary']}; color: white; border: none; padding: 10px 20px; border-radius: 5px;">
+                Gratuit
+            </button>
         </div>
         """, unsafe_allow_html=True)
-        
-        if st.button("Commencer gratuitement", key="free_plan"):
-            st.session_state.page = 'register'
-            st.session_state.selected_plan = 'Free'
-            st.rerun()
     
     with col2:
-        st.markdown("""
-        <div class="plan-card">
-            <h3>⭐ Plan Premium</h3>
+        st.markdown(f"""
+        <div class="plan-card premium">
+            <h3>{get_text('premium_plan')}</h3>
             <h2>29€/mois</h2>
+            <p><small>Essai gratuit 14 jours</small></p>
             <ul style="text-align: left;">
                 <li>Recherches illimitées</li>
                 <li>IA avancée</li>
-                <li>Agent personnel</li>
-                <li>Alertes en temps réel</li>
                 <li>Support prioritaire</li>
+                <li>Notifications en temps réel</li>
             </ul>
+            <button style="background: {COLORS['primary']}; color: white; border: none; padding: 10px 20px; border-radius: 5px;">
+                Essayer gratuitement
+            </button>
         </div>
         """, unsafe_allow_html=True)
-        
-        if st.button(get_text("start_trial"), key="premium_trial"):
-            st.session_state.page = 'register'
-            st.session_state.selected_plan = 'Premium'
-            st.rerun()
     
     with col3:
-        st.markdown("""
+        st.markdown(f"""
         <div class="plan-card">
-            <h3>🏢 Plan Professionnel</h3>
+            <h3>{get_text('pro_plan')}</h3>
             <h2>99€/mois</h2>
             <ul style="text-align: left;">
-                <li>Tous les avantages Premium</li>
-                <li>API d'intégration</li>
-                <li>Dashboard avancé</li>
-                <li>Support dédié 24/7</li>
+                <li>Tout Premium +</li>
+                <li>API access</li>
                 <li>Rapports personnalisés</li>
+                <li>Support dédié</li>
             </ul>
+            <button style="background: {COLORS['primary']}; color: white; border: none; padding: 10px 20px; border-radius: 5px;">
+                Contacter
+            </button>
         </div>
         """, unsafe_allow_html=True)
-        
-        if st.button("Contacter l'équipe", key="pro_plan"):
-            st.session_state.page = 'contact'
-            st.rerun()
     
     # Partenaires
-    st.subheader("🤝 Nos Partenaires")
+    st.markdown("## Nos partenaires")
     col1, col2, col3, col4 = st.columns(4)
-    
-    partners = ["BNP Paribas", "Crédit Agricole", "LCL", "Société Générale"]
-    for i, partner in enumerate(partners):
-        with [col1, col2, col3, col4][i]:
-            st.markdown(f"""
-            <div class="metric-card">
-                <h4>{partner}</h4>
-                <p>Partenaire bancaire</p>
-            </div>
-            """, unsafe_allow_html=True)
+    with col1:
+        st.markdown("🏠 **Century 21**")
+    with col2:
+        st.markdown("🏢 **Orpi**")
+    with col3:
+        st.markdown("🏗️ **Nexity**")
+    with col4:
+        st.markdown("🔑 **Foncia**")
     
     # Contact
-    st.subheader(f"📞 {get_text('contact_info')}")
+    st.markdown("## Contact")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown("📧 **contact@imomatch.fr**")
+        st.markdown("📞 **+33 1 23 45 67 89**")
+    with col2:
+        st.markdown("📍 **Paris, France**")
+        st.markdown("🌐 **www.imomatch.fr**")
+
+def show_login_page():
+    """Page de connexion"""
+    create_logo()
+    
+    tab1, tab2 = st.tabs([get_text('login'), get_text('register')])
+    
+    with tab1:
+        st.markdown("### Connexion")
+        with st.form("login_form"):
+            email = st.text_input("Email")
+            password = st.text_input("Mot de passe", type="password")
+            submitted = st.form_submit_button("Se connecter")
+            
+            if submitted and email and password:
+                user = st.session_state.db.authenticate_user(email, password)
+                if user:
+                    st.session_state.authenticated = True
+                    st.session_state.user = user
+                    st.rerun()
+                else:
+                    st.error("Email ou mot de passe incorrect")
+    
+    with tab2:
+        st.markdown("### Inscription")
+        with st.form("register_form"):
+            col1, col2 = st.columns(2)
+            with col1:
+                first_name = st.text_input("Prénom")
+                last_name = st.text_input("Nom")
+                email = st.text_input("Email", key="reg_email")
+            with col2:
+                phone = st.text_input("Téléphone")
+                age = st.number_input("Âge", min_value=18, max_value=100)
+                profession = st.text_input("Profession")
+            
+            password = st.text_input("Mot de passe", type="password", key="reg_password")
+            password_confirm = st.text_input("Confirmer le mot de passe", type="password")
+            plan = st.selectbox("Plan", ["free", "premium", "professional"])
+            
+            submitted = st.form_submit_button("S'inscrire")
+            
+            if submitted:
+                if password != password_confirm:
+                    st.error("Les mots de passe ne correspondent pas")
+                elif len(password) < 6:
+                    st.error("Le mot de passe doit contenir au moins 6 caractères")
+                else:
+                    user_id = st.session_state.db.create_user(
+                        email=email,
+                        password=password,
+                        first_name=first_name,
+                        last_name=last_name,
+                        phone=phone,
+                        age=age,
+                        profession=profession,
+                        plan=plan
+                    )
+                    
+                    if user_id:
+                        st.success("Inscription réussie ! Vous pouvez maintenant vous connecter.")
+                    else:
+                        st.error("Cet email est déjà utilisé")
+
+def show_my_info_page():
+    """Page des informations utilisateur avec Agent IA"""
+    st.markdown("# Mes informations")
+    
+    user = st.session_state.user
+    
+    # Onglets pour organiser les informations
+    tab1, tab2, tab3 = st.tabs(["Profil", "Préférences", "Agent IA"])
+    
+    with tab1:
+        st.markdown("## Informations personnelles")
+        
+        with st.form("user_info_form"):
+            col1, col2 = st.columns(2)
+            with col1:
+                first_name = st.text_input("Prénom", value=user.get('first_name', ''))
+                last_name = st.text_input("Nom", value=user.get('last_name', ''))
+                email = st.text_input("Email", value=user.get('email', ''), disabled=True)
+            with col2:
+                phone = st.text_input("Téléphone", value=user.get('phone', ''))
+                age = st.number_input("Âge", value=user.get('age', 25), min_value=18, max_value=100)
+                profession = st.text_input("Profession", value=user.get('profession', ''))
+            
+            submitted = st.form_submit_button("Mettre à jour")
+            if submitted:
+                st.success("Informations mises à jour avec succès !")
+    
+    with tab2:
+        st.markdown("## Préférences de recherche")
+        
+        prefs = st.session_state.db.get_user_preferences(user['id']) or {}
+        
+        with st.form("preferences_form"):
+            col1, col2 = st.columns(2)
+            with col1:
+                budget_min = st.number_input("Budget minimum (€)", 
+                                           value=prefs.get('budget_min', 100000), 
+                                           min_value=0, step=10000)
+                budget_max = st.number_input("Budget maximum (€)", 
+                                           value=prefs.get('budget_max', 500000), 
+                                           min_value=0, step=10000)
+                property_type = st.selectbox("Type de bien", 
+                                           ["Appartement", "Maison", "Studio", "Loft"],
+                                           index=0 if not prefs.get('property_type') else 
+                                           ["Appartement", "Maison", "Studio", "Loft"].index(prefs.get('property_type', 'Appartement')))
+            
+            with col2:
+                bedrooms = st.number_input("Nombre de chambres", 
+                                         value=prefs.get('bedrooms', 2), 
+                                         min_value=1, max_value=10)
+                bathrooms = st.number_input("Nombre de salles de bain", 
+                                          value=prefs.get('bathrooms', 1), 
+                                          min_value=1, max_value=5)
+                surface_min = st.number_input("Surface minimale (m²)", 
+                                            value=prefs.get('surface_min', 50), 
+                                            min_value=10, step=10)
+            
+            location = st.text_input("Localisation préférée", 
+                                   value=prefs.get('location', ''))
+            
+            submitted = st.form_submit_button("Sauvegarder les préférences")
+            if submitted:
+                preferences = {
+                    'budget_min': budget_min,
+                    'budget_max': budget_max,
+                    'property_type': property_type,
+                    'bedrooms': bedrooms,
+                    'bathrooms': bathrooms,
+                    'surface_min': surface_min,
+                    'location': location
+                }
+                st.session_state.db.save_user_preferences(user['id'], preferences)
+                st.success("Préférences sauvegardées avec succès !")
+    
+    with tab3:
+        show_ai_agent()
+
+def show_ai_agent():
+    """Agent IA pour enrichir les informations utilisateur"""
+    st.markdown("## 🤖 Agent IA - Assistant personnel")
+    
+    # Initialiser l'historique de chat s'il n'existe pas
+    if 'chat_history' not in st.session_state:
+        st.session_state.chat_history = [
+            {"role": "assistant", "content": "Bonjour ! Je suis votre assistant IA personnel. Je peux vous aider à affiner vos critères de recherche immobilière. Que souhaitez-vous savoir ou améliorer dans votre profil ?"}
+        ]
+    
+    # Affichage de l'historique de chat
+    chat_container = st.container()
+    with chat_container:
+        for message in st.session_state.chat_history:
+            if message["role"] == "user":
+                st.markdown(f"""
+                <div class="user-message">
+                    {message["content"]}
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                st.markdown(f"""
+                <div class="ai-message">
+                    {message["content"]}
+                </div>
+                """, unsafe_allow_html=True)
+    
+    # Zone de saisie pour nouveau message
+    user_input = st.text_input("Posez votre question...", key="ai_input")
+    
+    if st.button("Envoyer") and user_input:
+        # Ajouter le message utilisateur
+        st.session_state.chat_history.append({"role": "user", "content": user_input})
+        
+        # Simuler une réponse de l'IA (en production, vous utiliseriez une vraie API IA)
+        ai_response = generate_ai_response(user_input, st.session_state.user)
+        st.session_state.chat_history.append({"role": "assistant", "content": ai_response})
+        
+        st.rerun()
+    
+    # Questions suggérées
+    st.markdown("### Questions suggérées :")
     col1, col2 = st.columns(2)
     
     with col1:
-        st.markdown("""
-        <div class="value-card">
-            <h4>📧 Email</h4>
-            <p>contact@imomatch.com</p>
-            <h4>📱 Téléphone</h4>
-            <p>+33 1 23 45 67 89</p>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col2:
-        st.markdown("""
-        <div class="value-card">
-            <h4>🏢 Adresse</h4>
-            <p>123 Avenue des Champs-Élysées<br>75008 Paris, France</p>
-            <h4>🕐 Horaires</h4>
-            <p>Lundi - Vendredi: 9h-18h</p>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    # Boutons de connexion/inscription
-    st.markdown("---")
-    col1, col2, col3 = st.columns([1, 1, 1])
-    
-    with col1:
-        if st.button("🔐 Se connecter", use_container_width=True):
-            st.session_state.page = 'login'
+        if st.button("Aidez-moi à définir mon budget"):
+            st.session_state.chat_history.append({"role": "user", "content": "Aidez-moi à définir mon budget"})
+            ai_response = "Pour vous aider à définir votre budget, j'ai besoin de quelques informations : Quel est votre revenu mensuel net ? Avez-vous des économies pour l'apport ? Quel est votre situation familiale ?"
+            st.session_state.chat_history.append({"role": "assistant", "content": ai_response})
+            st.rerun()
+        
+        if st.button("Quels quartiers me recommandez-vous ?"):
+            st.session_state.chat_history.append({"role": "user", "content": "Quels quartiers me recommandez-vous ?"})
+            ai_response = "Basé sur votre profil, je peux vous recommander des quartiers. Pouvez-vous me dire : Travaillez-vous dans un lieu spécifique ? Préférez-vous le calme ou l'animation ? Avez-vous des enfants scolarisés ?"
+            st.session_state.chat_history.append({"role": "assistant", "content": ai_response})
             st.rerun()
     
     with col2:
-        if st.button("📝 S'inscrire", use_container_width=True):
-            st.session_state.page = 'register'
-            st.rerun()
-    
-    with col3:
-        if st.button("ℹ️ En savoir plus", use_container_width=True):
-            st.session_state.page = 'about'
-            st.rerun()
-
-def render_login_page(auth_manager):
-    """Affiche la page de connexion"""
-    render_header()
-    
-    st.markdown(f"""
-    <div class="main-header">
-        <h1>🔐 {get_text('login')}</h1>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    with st.form("login_form"):
-        col1, col2, col3 = st.columns([1, 2, 1])
-        
-        with col2:
-            email = st.text_input(get_text("email"), placeholder="votre@email.com")
-            password = st.text_input(get_text("password"), type="password")
-            
-            submit = st.form_submit_button("Se connecter", use_container_width=True)
-            
-            if submit:
-                if email and password:
-                    success, user = auth_manager.login_user(email, password)
-                    if success:
-                        st.session_state.authenticated = True
-                        st.session_state.user = user
-                        st.session_state.page = 'dashboard'
-                        st.success("Connexion réussie !")
-                        time.sleep(1)
-                        st.rerun()
-                    else:
-                        st.error("Email ou mot de passe incorrect")
-                else:
-                    st.error("Veuillez remplir tous les champs")
-    
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        if st.button("← Retour à l'accueil", use_container_width=True):
-            st.session_state.page = 'home'
-            st.rerun()
-        
-        if st.button("Pas encore de compte ? S'inscrire", use_container_width=True):
-            st.session_state.page = 'register'
-            st.rerun()
-
-def render_register_page(auth_manager):
-    """Affiche la page d'inscription"""
-    render_header()
-    
-    st.markdown(f"""
-    <div class="main-header">
-        <h1>📝 {get_text('register')}</h1>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    selected_plan = getattr(st.session_state, 'selected_plan', 'Free')
-    
-    if selected_plan != 'Free':
-        st.info(f"🎯 Vous vous inscrivez au plan {selected_plan}")
-    
-    with st.form("register_form"):
-        # Informations personnelles
-        st.subheader("👤 Informations personnelles")
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            prenom = st.text_input(get_text("firstname"), placeholder="Jean")
-            nom = st.text_input(get_text("name"), placeholder="Dupont")
-            email = st.text_input(get_text("email"), placeholder="jean.dupont@email.com")
-        
-        with col2:
-            telephone = st.text_input(get_text("phone"), placeholder="+33 6 12 34 56 78")
-            password = st.text_input(get_text("password"), type="password")
-            confirm_password = st.text_input("Confirmer le mot de passe", type="password")
-        
-        # Informations professionnelles
-        st.subheader("💼 Informations professionnelles")
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            profession = st.text_input(get_text("profession"), placeholder="Ingénieur")
-            situation_familiale = st.selectbox(get_text("family_situation"), 
-                                             ["Célibataire", "Marié(e)", "Pacsé(e)", "Divorcé(e)", "Veuf/Veuve"])
-        
-        with col2:
-            revenus = st.number_input(get_text("income"), min_value=0.0, step=100.0, value=0.0)
-            apport = st.number_input(get_text("contribution"), min_value=0.0, step=1000.0, value=0.0)
-        
-        credits_en_cours = st.number_input(get_text("current_credits"), min_value=0.0, step=100.0, value=0.0)
-        
-        # Critères de recherche
-        st.subheader("🏠 Critères de recherche")
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            localisation_actuelle = st.text_input(get_text("current_location"), placeholder="Paris")
-            localisation_souhaitee = st.text_input(get_text("desired_location"), placeholder="Région parisienne")
-            type_bien = st.selectbox(get_text("property_type"), 
-                                   ["", "Appartement", "Maison", "Studio", "Loft", "Duplex"])
-        
-        with col2:
-            budget_min = st.number_input(get_text("min_budget"), min_value=0.0, step=10000.0, value=0.0)
-            budget_max = st.number_input(get_text("max_budget"), min_value=0.0, step=10000.0, value=0.0)
-            surface_min = st.number_input(get_text("min_surface"), min_value=0.0, step=5.0, value=0.0)
-        
-        nb_pieces_min = st.number_input(get_text("min_rooms"), min_value=1, step=1, value=1)
-        
-        # Critères spécifiques
-        st.subheader("🎯 Critères spécifiques (optionnel)")
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            balcon = st.checkbox("Balcon/Terrasse")
-            parking = st.checkbox("Parking/Garage")
-        with col2:
-            ascenseur = st.checkbox("Ascenseur")
-            jardin = st.checkbox("Jardin")
-        with col3:
-            piscine = st.checkbox("Piscine")
-            cave = st.checkbox("Cave/Cellier")
-        
-        criteres_specifiques = {
-            'balcon': balcon, 'parking': parking, 'ascenseur': ascenseur,
-            'jardin': jardin, 'piscine': piscine, 'cave': cave
-        }
-        
-        # Acceptation des conditions
-        st.markdown("---")
-        accept_terms = st.checkbox("J'accepte les conditions générales d'utilisation")
-        accept_newsletter = st.checkbox("Je souhaite recevoir la newsletter ImoMatch")
-        
-        submit = st.form_submit_button("Créer mon compte", use_container_width=True)
-        
-        if submit:
-            if not all([prenom, nom, email, password, confirm_password]):
-                st.error("Veuillez remplir tous les champs obligatoires")
-            elif password != confirm_password:
-                st.error("Les mots de passe ne correspondent pas")
-            elif not accept_terms:
-                st.error("Vous devez accepter les conditions générales d'utilisation")
-            else:
-                user_data = {
-                    'email': email,
-                    'password': password,
-                    'nom': nom,
-                    'prenom': prenom,
-                    'telephone': telephone,
-                    'profession': profession,
-                    'situation_familiale': situation_familiale,
-                    'revenus': revenus,
-                    'apport': apport,
-                    'credits_en_cours': credits_en_cours,
-                    'localisation_actuelle': localisation_actuelle,
-                    'localisation_souhaitee': localisation_souhaitee,
-                    'type_bien': type_bien,
-                    'budget_min': budget_min,
-                    'budget_max': budget_max,
-                    'surface_min': surface_min,
-                    'nb_pieces_min': nb_pieces_min,
-                    'criteres_specifiques': criteres_specifiques,
-                    'plan': selected_plan
-                }
-                
-                if selected_plan == 'Premium':
-                    user_data['plan_expiration'] = (datetime.now() + timedelta(days=14)).isoformat()
-                
-                success, message = auth_manager.register_user(user_data)
-                
-                if success:
-                    st.success("Compte créé avec succès ! Vous pouvez maintenant vous connecter.")
-                    time.sleep(2)
-                    st.session_state.page = 'login'
-                    st.rerun()
-                else:
-                    st.error(message)
-    
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        if st.button("← Retour à l'accueil", use_container_width=True):
-            st.session_state.page = 'home'
-            st.rerun()
-        
-        if st.button("Déjà un compte ? Se connecter", use_container_width=True):
-            st.session_state.page = 'login'
-            st.rerun()
-
-def render_sidebar(user):
-    """Affiche la barre latérale avec navigation"""
-    with st.sidebar:
-        # Logo et informations utilisateur
-        st.markdown(f"""
-        <div style="text-align: center; padding: 1rem;">
-            <div style="font-size: 2rem;">🏠</div>
-            <h2 style="color: #FF6B35;">ImoMatch</h2>
-            <p>Bienvenue {user['prenom']} !</p>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # Navigation
-        st.markdown("### 🗺️ Navigation")
-        
-        menu_items = [
-            ("📊 Dashboard", "dashboard"),
-            ("👤 Mes informations", "my_info"),
-            ("🎯 Recommandations", "recommendations"),
-            ("🔍 Recherche avancée", "advanced_search"),
-            ("🤖 Agent AI", "agent_ai")
-        ]
-        
-        for label, page_key in menu_items:
-            if st.button(label, use_container_width=True):
-                st.session_state.page = page_key
-                st.rerun()
-        
-        st.markdown("---")
-        
-        # Informations du plan
-        plan_color = "#4CAF50" if user['plan'] == 'Free' else "#FF9800" if user['plan'] == 'Premium' else "#9C27B0"
-        st.markdown(f"""
-        <div style="background: {plan_color}22; padding: 1rem; border-radius: 10px; border: 1px solid {plan_color};">
-            <h4 style="color: {plan_color}; margin: 0;">Plan {user['plan']}</h4>
-            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">
-                {'Accès limité' if user['plan'] == 'Free' else 'Accès premium' if user['plan'] == 'Premium' else 'Accès professionnel'}
-            </p>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        if user['plan'] == 'Free':
-            if st.button("⬆️ Passer au Premium", use_container_width=True):
-                st.info("Redirection vers la page d'upgrade...")
-        
-        st.markdown("---")
-        
-        # Déconnexion
-        if st.button("🚪 Déconnexion", use_container_width=True):
-            st.session_state.authenticated = False
-            st.session_state.user = None
-            st.session_state.page = 'home'
-            st.rerun()
-
-def main():
-    """Fonction principale de l'application"""
-    # Initialisation
-    init_session_state()
-    
-    # Application du thème
-    ThemeManager.apply_theme(st.session_state.theme)
-    
-    # Initialisation des managers
-    db_manager = DatabaseManager()
-    auth_manager = AuthManager(db_manager)
-    
-    # Routing de l'application
-    if not st.session_state.authenticated:
-        # Pages publiques
-        if st.session_state.page == 'home':
-            render_home_page(db_manager, auth_manager)
-        elif st.session_state.page == 'login':
-            render_login_page(auth_manager)
-        elif st.session_state.page == 'register':
-            render_register_page(auth_manager)
-        else:
-            render_home_page(db_manager, auth_manager)
-    else:
-        # Pages authentifiées
-        user = st.session_state.user
-        render_sidebar(user)
-        
-        if st.session_state.page == 'dashboard':
-            st.write("Dashboard en cours de développement...")
-        elif st.session_state.page == 'my_info':
-            st.write("Mes informations en cours de développement...")
-        elif st.session_state.page == 'recommendations':
-            st.write("Recommandations en cours de développement...")
-        elif st.session_state.page == 'advanced_search':
-            st.write("Recherche avancée en cours de développement...")
-        elif st.session_state.page == 'agent_ai':
-            st.write("Agent AI en cours de développement...")
-        else:
-            st.write("Dashboard en cours de développement...")
-
-# Point d'entrée de l'application
-if __name__ == "__main__":
-    main()
+        if st.button("Optimiser mes critères de recherche"):
+            st.session_state.chat_history.append({"role": "user", "content": "Optimiser mes critères de recherche"})
+            ai_response = "Analysons vos critères actuels. Je vois que vous cherchez un bien entre " + str(st.session_state.db.get_user_preferences(st.session_state.user['id']) or {}).get('budget_min', 'N/A') + "€ et " + str(st.session_
