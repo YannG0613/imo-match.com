@@ -1,0 +1,370 @@
+# ImoMatch - Fichiers à ignorer par Git
+
+# === FICHIERS DE CONFIGURATION SENSIBLES ===
+.env
+.env.local
+.env.production
+*.env
+config/local.py
+secrets.json
+credentials.json
+
+# === BASE DE DONNÉES ===
+*.db
+*.sqlite
+*.sqlite3
+imomatch.db
+database/*.db
+backups/*.db
+migrations/*.db
+
+# === LOGS ===
+*.log
+logs/
+*.log.*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# === PYTHON ===
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+
+# Translations
+*.mo
+*.pot
+
+# Django stuff:
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Flask stuff:
+instance/
+.webassets-cache
+
+# Scrapy stuff:
+.scrapy
+
+# Sphinx documentation
+docs/_build/
+
+# PyBuilder
+target/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+.python-version
+
+# pipenv
+Pipfile.lock
+
+# PEP 582
+__pypackages__/
+
+# Celery stuff
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+imomatch_env/
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# === STREAMLIT ===
+.streamlit/
+.streamlit/secrets.toml
+.streamlit/config.toml
+
+# === IDE / EDITEURS ===
+# VSCode
+.vscode/
+*.code-workspace
+
+# PyCharm
+.idea/
+*.iws
+*.iml
+*.ipr
+.idea_modules/
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# === SYSTÈME ===
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.tmp
+*.temp
+Desktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# === FICHIERS TEMPORAIRES ===
+*.tmp
+*.temp
+*.bak
+*.backup
+*.old
+*.orig
+temp/
+tmp/
+
+# === UPLOADS ET MÉDIAS ===
+uploads/
+media/
+static/media/
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.bmp
+*.tiff
+*.ico
+*.svg
+*.webp
+*.mp4
+*.avi
+*.mov
+*.wmv
+*.flv
+*.mp3
+*.wav
+*.ogg
+
+# === CACHE ===
+.cache/
+*.cache
+cache/
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+
+# === SAUVEGARDES ===
+backup_*.db
+backup_*.sql
+*.backup
+backups/
+dumps/
+
+# === TESTS ===
+.coverage
+htmlcov/
+.pytest_cache/
+test-results/
+test_*.py.bak
+
+# === DOCUMENTATION ===
+docs/_build/
+site/
+.mkdocs/
+
+# === AUTRES FICHIERS SPÉCIFIQUES À IMOMATCH ===
+# Données sensibles
+api_keys.json
+firebase-service-account.json
+google-credentials.json
+
+# Fichiers de développement
+debug.py
+test_data.py
+playground.py
+scratch.py
+
+# Fichiers de production
+prod_config.py
+production.ini
+
+# Statistiques et analytics
+analytics/
+stats/
+reports/
+
+# Fichiers temporaires de l'application
+*.lock
+*.pid
+*.seed
+*.pid.lock
+
+# === DÉPLOIEMENT ===
+# Docker
+Dockerfile.prod
+docker-compose.prod.yml
+.dockerignore
+
+# Heroku
+.slugignore
+
+# Vercel
+.vercel
+
+# Netlify
+.netlify/
+
+# AWS
+.aws/
+*.pem
+
+# === OUTILS DE DÉVELOPPEMENT ===
+# Coverage
+.coverage.*
+coverage/
+.nyc_output/
+
+# Linting
+.eslintcache
+.stylelintcache
+
+# Profiling
+*.prof
+*.pstats
+
+# === NOTES ET TODO ===
+TODO.md
+NOTES.md
+ROADMAP.md
+*.notes
+*.todo
+
+# === EXEMPLES ET TEMPLATES ===
+# Garder les exemples mais ignorer les copies locales
+example_local.py
+template_local.html
+local_*.json
+
+# === CONFIGURATION LOCALE DE DÉVELOPPEMENT ===
+dev_config.py
+local_settings.py
+development.ini
+
+# === MONITORING ===
+monitoring/
+metrics/
+logs/
