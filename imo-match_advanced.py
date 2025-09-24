@@ -7,6 +7,7 @@ import logging
 import sys
 import os
 from pathlib import Path
+from ui.footer import show_footer
 
 # Ajouter le répertoire racine au PYTHONPATH
 root_dir = Path(__file__).parent
@@ -131,7 +132,6 @@ class ImoMatchApp:
     
     def run(self):
         """Lance l'application"""
-        from ui.footer import show_footer
         try:
             # Créer le layout principal
             self._create_layout()
