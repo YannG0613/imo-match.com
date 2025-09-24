@@ -135,7 +135,6 @@ class ImoMatchApp:
         try:
             # Créer le layout principal
             self._create_layout()
-            show_footer()
             
             # Navigation et affichage
             self._handle_navigation()
@@ -544,3 +543,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+   show_footer()
