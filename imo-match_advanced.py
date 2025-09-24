@@ -131,6 +131,7 @@ class ImoMatchApp:
     
     def run(self):
         """Lance l'application"""
+        from ui.footer import show_footer
         try:
             # Créer le layout principal
             self._create_layout()
