@@ -10,7 +10,6 @@ def show_footer():
                     © 2024 YannG0613. Tous droits réservés.
                 </div>
             </div>
-
             <div style="text-align: right;">
                 <div style="margin-bottom: 0.5rem;">🇫🇷 Fait en France</div>
                 <div style="opacity: 0.8; font-size: 0.8rem;">
