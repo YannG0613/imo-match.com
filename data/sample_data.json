@@ -1,0 +1,430 @@
+{
+  "properties": [
+    {
+      "title": "Appartement lumineux centre-ville Antibes",
+      "price": 380000,
+      "property_type": "Appartement",
+      "bedrooms": 3,
+      "bathrooms": 2,
+      "surface": 85,
+      "location": "Antibes Centre, Alpes-Maritimes",
+      "latitude": 43.5804,
+      "longitude": 7.1225,
+      "description": "Magnifique appartement de 3 pièces situé en plein cœur d'Antibes, dans un immeuble bourgeois rénové. Proche de toutes commodités, transports et du marché provençal. Exposition sud avec balcon donnant sur une cour arborée.",
+      "features": [
+        "Balcon",
+        "Parking",
+        "Ascenseur",
+        "Cave",
+        "Climatisation",
+        "Double vitrage"
+      ],
+      "images": [
+        "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2",
+        "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688"
+      ],
+      "agent_contact": "Marie Dubois - 06.12.34.56.78 - marie.dubois@immo-riviera.fr",
+      "year_built": 1995,
+      "floor": 3,
+      "total_floors": 5,
+      "energy_class": "C",
+      "available_date": "2024-02-01"
+    },
+    {
+      "title": "Villa contemporaine avec piscine Juan-les-Pins",
+      "price": 1250000,
+      "property_type": "Villa",
+      "bedrooms": 4,
+      "bathrooms": 3,
+      "surface": 180,
+      "location": "Juan-les-Pins, Antibes",
+      "latitude": 43.5673,
+      "longitude": 7.1063,
+      "description": "Superbe villa contemporaine de 180m² sur un terrain de 800m² avec piscine chauffée. Architecture moderne avec de grandes baies vitrées, cuisine américaine équipée haut de gamme. À 5 minutes à pied des plages de Juan-les-Pins.",
+      "features": [
+        "Piscine",
+        "Jardin",
+        "Garage double",
+        "Terrasse",
+        "Barbecue",
+        "Alarme",
+        "Portail électrique",
+        "Arrosage automatique"
+      ],
+      "images": [
+        "https://images.unsplash.com/photo-1613977257363-707ba9348227",
+        "https://images.unsplash.com/photo-1600585154340-be6161a56a0c"
+      ],
+      "agent_contact": "Pierre Martin - 04.93.12.34.56 - p.martin@luxury-homes.com",
+      "year_built": 2018,
+      "garden_surface": 800,
+      "energy_class": "B",
+      "available_date": "2024-03-15"
+    },
+    {
+      "title": "Studio rénové proche plages Cannes",
+      "price": 195000,
+      "property_type": "Studio",
+      "bedrooms": 0,
+      "bathrooms": 1,
+      "surface": 28,
+      "location": "Cannes Centre, Alpes-Maritimes",
+      "latitude": 43.5528,
+      "longitude": 7.0174,
+      "description": "Charmant studio entièrement rénové en 2023, situé à seulement 300 mètres des plages de Cannes. Idéal pour investissement locatif ou pied-à-terre. Cuisine équipée, salle de bain moderne avec douche italienne.",
+      "features": [
+        "Climatisation",
+        "Kitchenette équipée",
+        "Balcon",
+        "Double vitrage",
+        "Fibre optique",
+        "Proche transports"
+      ],
+      "images": [
+        "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267",
+        "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688"
+      ],
+      "agent_contact": "Sophie Mercier - 04.92.98.76.54 - s.mercier@cannes-immo.fr",
+      "year_built": 1970,
+      "floor": 2,
+      "total_floors": 6,
+      "energy_class": "D",
+      "renovation_year": 2023,
+      "available_date": "2024-01-15"
+    },
+    {
+      "title": "Maison familiale avec grand jardin Nice Est",
+      "price": 620000,
+      "property_type": "Maison",
+      "bedrooms": 4,
+      "bathrooms": 2,
+      "surface": 120,
+      "location": "Nice Est, Alpes-Maritimes",
+      "latitude": 43.7102,
+      "longitude": 7.2620,
+      "description": "Belle maison familiale de 120m² avec jardin de 400m² dans quartier résidentiel calme de Nice Est. 4 chambres, séjour lumineux, cuisine équipée, garage et cave. Proche écoles et commerces.",
+      "features": [
+        "Jardin",
+        "Garage",
+        "Cheminée",
+        "Cave",
+        "Buanderie",
+        "Portail électrique",
+        "Volets électriques"
+      ],
+      "images": [
+        "https://images.unsplash.com/photo-1576941089067-2de3c901e126",
+        "https://images.unsplash.com/photo-1600585154526-990dced4db0d"
+      ],
+      "agent_contact": "Jean-Claude Riviera - 04.93.87.65.43 - jc.riviera@nice-properties.com",
+      "year_built": 1985,
+      "garden_surface": 400,
+      "energy_class": "C",
+      "available_date": "2024-02-15"
+    },
+    {
+      "title": "Penthouse exceptionnel vue mer Monaco",
+      "price": 3500000,
+      "property_type": "Penthouse",
+      "bedrooms": 3,
+      "bathrooms": 3,
+      "surface": 150,
+      "location": "Monaco Monte-Carlo",
+      "latitude": 43.7384,
+      "longitude": 7.4246,
+      "description": "Exceptionnel penthouse de 150m² avec terrasse de 80m² offrant une vue panoramique sur la mer et le port de Monaco. Prestations haut de gamme, matériaux nobles, domotique complète. Parking et cave inclus.",
+      "features": [
+        "Vue mer",
+        "Terrasse 80m²",
+        "Concierge 24h/24",
+        "Parking",
+        "Cave à vin",
+        "Climatisation",
+        "Domotique",
+        "Sécurité renforcée",
+        "Piscine de la résidence"
+      ],
+      "images": [
+        "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c",
+        "https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3"
+      ],
+      "agent_contact": "Luxury Homes Monaco - +377.93.12.34.56 - contact@luxury-monaco.com",
+      "year_built": 2020,
+      "floor": 15,
+      "total_floors": 15,
+      "terrace_surface": 80,
+      "energy_class": "A",
+      "available_date": "2024-04-01"
+    },
+    {
+      "title": "Appartement T2 rénové Vieux Nice",
+      "price": 285000,
+      "property_type": "Appartement",
+      "bedrooms": 1,
+      "bathrooms": 1,
+      "surface": 45,
+      "location": "Vieux Nice, Alpes-Maritimes",
+      "latitude": 43.6964,
+      "longitude": 7.2758,
+      "description": "Charmant T2 de 45m² entièrement rénové dans une rue piétonne du Vieux Nice. Poutres apparentes, tomettes provençales, cuisine ouverte moderne. Rare sur le marché, idéal résidence principale ou investissement.",
+      "features": [
+        "Poutres apparentes",
+        "Tomettes d'origine",
+        "Cuisine ouverte",
+        "Double vitrage",
+        "Fibre optique",
+        "Rue piétonne"
+      ],
+      "images": [
+        "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688",
+        "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2"
+      ],
+      "agent_contact": "Agnès Moreau - 04.93.55.44.33 - a.moreau@vieuxnice-immobilier.fr",
+      "year_built": 1890,
+      "floor": 2,
+      "total_floors": 4,
+      "energy_class": "D",
+      "renovation_year": 2022,
+      "available_date": "2024-01-30"
+    },
+    {
+      "title": "Villa moderne vue panoramique Mougins",
+      "price": 980000,
+      "property_type": "Villa",
+      "bedrooms": 3,
+      "bathrooms": 2,
+      "surface": 140,
+      "location": "Mougins Village, Alpes-Maritimes",
+      "latitude": 43.5998,
+      "longitude": 7.0058,
+      "description": "Villa contemporaine de 140m² avec vue panoramique sur la baie de Cannes et les îles de Lérins. Terrain de 1200m² en restanques, piscine à débordement, garage double. Architecture provençale moderne.",
+      "features": [
+        "Vue panoramique",
+        "Piscine à débordement",
+        "Garage double",
+        "Terrasses",
+        "Cuisine d'été",
+        "Cheminée",
+        "Arrosage automatique",
+        "Portail électrique"
+      ],
+      "images": [
+        "https://images.unsplash.com/photo-1600585154340-be6161a56a0c",
+        "https://images.unsplash.com/photo-1613977257363-707ba9348227"
+      ],
+      "agent_contact": "Christophe Dubois - 04.92.75.88.99 - c.dubois@mougins-prestige.com",
+      "year_built": 2015,
+      "garden_surface": 1200,
+      "energy_class": "B",
+      "available_date": "2024-03-01"
+    },
+    {
+      "title": "Loft industriel Cannes La Bocca",
+      "price": 450000,
+      "property_type": "Loft",
+      "bedrooms": 2,
+      "bathrooms": 2,
+      "surface": 95,
+      "location": "Cannes La Bocca, Alpes-Maritimes",
+      "latitude": 43.5693,
+      "longitude": 7.0067,
+      "description": "Superbe loft de 95m² dans ancienne usine réhabilitée. Volumes exceptionnels avec hauteur sous plafond de 4m, poutres métalliques, grandes verrières. Proche gare SNCF et autoroutes.",
+      "features": [
+        "Hauteur 4m",
+        "Poutres métalliques",
+        "Grandes verrières",
+        "Mezzanine",
+        "Parking privé",
+        "Proche gare SNCF",
+        "Fibre optique"
+      ],
+      "images": [
+        "https://images.unsplash.com/photo-1586023492125-27b2c045efd7",
+        "https://images.unsplash.com/photo-1595526114035-0d45ed16cfbf"
+      ],
+      "agent_contact": "Laura Fontaine - 04.93.47.22.11 - l.fontaine@loft-cannes.fr",
+      "year_built": 1960,
+      "floor": 1,
+      "total_floors": 3,
+      "energy_class": "C",
+      "renovation_year": 2019,
+      "available_date": "2024-02-20"
+    },
+    {
+      "title": "Duplex avec terrasse Grasse centre",
+      "price": 320000,
+      "property_type": "Duplex",
+      "bedrooms": 3,
+      "bathrooms": 2,
+      "surface": 90,
+      "location": "Grasse Centre, Alpes-Maritimes",
+      "latitude": 43.6584,
+      "longitude": 6.9225,
+      "description": "Magnifique duplex de 90m² avec terrasse de 40m² en centre-ville de Grasse. Rénové avec goût, cuisine équipée, parquet dans les chambres. Vue dégagée sur les collines grassoises.",
+      "features": [
+        "Terrasse 40m²",
+        "Cuisine équipée",
+        "Parquet",
+        "Vue dégagée",
+        "Centre-ville",
+        "Climatisation",
+        "Parking"
+      ],
+      "images": [
+        "https://images.unsplash.com/photo-1560448204-61dc36dc98c8",
+        "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688"
+      ],
+      "agent_contact": "Michel Rossi - 04.93.36.25.14 - m.rossi@grasse-immobilier.com",
+      "year_built": 1980,
+      "floor": 4,
+      "total_floors": 5,
+      "terrace_surface": 40,
+      "energy_class": "D",
+      "renovation_year": 2021,
+      "available_date": "2024-01-25"
+    },
+    {
+      "title": "Mas provençal rénové Valbonne",
+      "price": 750000,
+      "property_type": "Maison",
+      "bedrooms": 4,
+      "bathrooms": 3,
+      "surface": 160,
+      "location": "Valbonne Village, Alpes-Maritimes",
+      "latitude": 43.6425,
+      "longitude": 7.0367,
+      "description": "Authentique mas provençal du 18ème siècle entièrement rénové avec matériaux nobles. Terrain de 2000m² avec oliveraie, piscine naturelle, pool house. Prestations exceptionnelles dans cadre unique.",
+      "features": [
+        "Mas du 18ème",
+        "Terrain 2000m²",
+        "Piscine naturelle",
+        "Pool house",
+        "Oliveraie",
+        "Cheminée pierre",
+        "Poutres chêne",
+        "Tomettes anciennes"
+      ],
+      "images": [
+        "https://images.unsplash.com/photo-1600607687644-c7171b42498f",
+        "https://images.unsplash.com/photo-1600585154526-990dced4db0d"
+      ],
+      "agent_contact": "Sylvie Blanc - 04.93.12.77.88 - s.blanc@provence-authentique.com",
+      "year_built": 1750,
+      "garden_surface": 2000,
+      "energy_class": "C",
+      "renovation_year": 2020,
+      "available_date": "2024-03-10"
+    }
+  ],
+  
+  "cities": [
+    {
+      "name": "Antibes",
+      "department": "Alpes-Maritimes",
+      "region": "Provence-Alpes-Côte d'Azur",
+      "latitude": 43.5804,
+      "longitude": 7.1225,
+      "population": 75000,
+      "average_price_m2": 5200,
+      "districts": [
+        "Centre-ville",
+        "Juan-les-Pins", 
+        "Cap d'Antibes",
+        "Fontonne",
+        "Bréguières"
+      ]
+    },
+    {
+      "name": "Cannes",
+      "department": "Alpes-Maritimes", 
+      "region": "Provence-Alpes-Côte d'Azur",
+      "latitude": 43.5528,
+      "longitude": 7.0174,
+      "population": 75000,
+      "average_price_m2": 6800,
+      "districts": [
+        "Centre-ville",
+        "Croisette",
+        "La Bocca",
+        "Palm Beach",
+        "Croix des Gardes"
+      ]
+    },
+    {
+      "name": "Nice",
+      "department": "Alpes-Maritimes",
+      "region": "Provence-Alpes-Côte d'Azur", 
+      "latitude": 43.7102,
+      "longitude": 7.2620,
+      "population": 340000,
+      "average_price_m2": 4900,
+      "districts": [
+        "Vieux Nice",
+        "Cimiez",
+        "Libération",
+        "Port",
+        "TNL"
+      ]
+    },
+    {
+      "name": "Monaco",
+      "department": "Monaco",
+      "region": "Monaco",
+      "latitude": 43.7384,
+      "longitude": 7.4246,
+      "population": 38000,
+      "average_price_m2": 35000,
+      "districts": [
+        "Monaco-Ville",
+        "Monte-Carlo", 
+        "La Condamine",
+        "Fontvieille"
+      ]
+    },
+    {
+      "name": "Grasse",
+      "department": "Alpes-Maritimes",
+      "region": "Provence-Alpes-Côte d'Azur",
+      "latitude": 43.6584,
+      "longitude": 6.9225,
+      "population": 50000,
+      "average_price_m2": 3800,
+      "districts": [
+        "Centre-ville",
+        "Saint-Jacques",
+        "Plan de Grasse",
+        "Plascassier"
+      ]
+    }
+  ],
+
+  "market_trends": {
+    "2024": {
+      "global_evolution": "+3.2%",
+      "by_city": {
+        "Antibes": "+2.8%",
+        "Cannes": "+4.1%",
+        "Nice": "+2.5%",
+        "Monaco": "+1.8%",
+        "Grasse": "+5.2%"
+      },
+      "by_property_type": {
+        "Appartement": "+2.9%",
+        "Maison": "+3.8%",
+        "Villa": "+1.5%",
+        "Studio": "+4.2%"
+      }
+    }
+  },
+
+  "popular_searches": [
+    "Appartement 3 pièces Antibes",
+    "Villa piscine Cannes", 
+    "Studio Nice centre",
+    "Maison jardin Juan-les-Pins",
+    "Penthouse vue mer Monaco",
+    "T2 Vieux Nice",
+    "Loft Cannes",
+    "Mas provençal Valbonne"
+  ]
+}
