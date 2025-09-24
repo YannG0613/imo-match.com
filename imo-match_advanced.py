@@ -141,7 +141,6 @@ class ImoMatchApp:
             
             # Affiche le cartouche de bas de page
             show_footer()
-            
         except Exception as e:
             logger.error(f"Erreur dans l'application principale: {e}")
             st.error("Une erreur s'est produite. Veuillez actualiser la page.")
