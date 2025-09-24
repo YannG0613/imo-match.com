@@ -5,6 +5,7 @@ import streamlit as st
 from datetime import datetime
 import logging
 
+from typing import List, Dict
 from config.settings import COLORS, APP_CONFIG, STREAMLIT_CONFIG
 from auth.authentication import auth_manager, get_current_user
 from utils.helpers import get_app_statistics
