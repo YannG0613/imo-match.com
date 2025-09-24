@@ -7,6 +7,7 @@ import logging
 import sys
 import os
 from pathlib import Path
+import database
 
 # Ajouter le répertoire racine au PYTHONPATH
 root_dir = Path(__file__).parent
