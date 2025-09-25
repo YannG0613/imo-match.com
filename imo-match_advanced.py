@@ -8,6 +8,8 @@ import sys
 import os
 from pathlib import Path
 from ui.footer import show_footer
+from database.manager import DatabaseManager  # ou les fonctions que vous utilisez
+from auth.authentication import login_user, logout_user  # ou les fonctions que vous utilisez
 
 # Ajouter le répertoire racine au PYTHONPATH
 root_dir = Path(__file__).parent
