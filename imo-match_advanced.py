@@ -1,6 +1,7 @@
 """
 ImoMatch - Application Immobilière Complète avec IA
 Business Case Implementation
+Version finale - Prêt pour déploiement
 """
 import streamlit as st
 import pandas as pd
@@ -63,12 +64,6 @@ st.markdown("""
         margin: 0.2rem;
         display: inline-block;
         font-size: 0.9rem;
-    }
-    .agent-card {
-        background: linear-gradient(135deg, #f8f9fa, #e9ecef);
-        border-radius: 10px;
-        padding: 1rem;
-        margin: 0.5rem 0;
     }
     .stat-box {
         background: white;
@@ -166,7 +161,6 @@ class ImoMatchDatabase:
                 phone TEXT,
                 specialization TEXT,
                 experience_years INTEGER,
-                photo_url TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
@@ -181,23 +175,6 @@ class ImoMatchDatabase:
                 FOREIGN KEY (user_id) REFERENCES users (id),
                 FOREIGN KEY (property_id) REFERENCES properties (id),
                 UNIQUE(user_id, property_id)
-            )
-        ''')
-        
-        # Table visites
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS visits (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER,
-                property_id INTEGER,
-                agent_id INTEGER,
-                visit_date DATETIME,
-                status TEXT DEFAULT 'scheduled',
-                notes TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users (id),
-                FOREIGN KEY (property_id) REFERENCES properties (id),
-                FOREIGN KEY (agent_id) REFERENCES agents (id)
             )
         ''')
         
@@ -217,15 +194,15 @@ class ImoMatchDatabase:
         
         # Agents d'exemple
         agents = [
-            ("Marie", "Dubois", "Century 21 Côte d'Azur", "marie.dubois@c21.fr", "0493123456", "luxe", 10, None),
-            ("Pierre", "Martin", "Orpi Antibes", "pierre.martin@orpi.fr", "0493789123", "familial", 15, None),
-            ("Sophie", "Leroy", "Laforêt Monaco", "sophie.leroy@laforet.fr", "0493456789", "prestige", 8, None),
+            ("Marie", "Dubois", "Century 21 Côte d'Azur", "marie.dubois@c21.fr", "0493123456", "luxe", 10),
+            ("Pierre", "Martin", "Orpi Antibes", "pierre.martin@orpi.fr", "0493789123", "familial", 15),
+            ("Sophie", "Leroy", "Laforêt Monaco", "sophie.leroy@laforet.fr", "0493456789", "prestige", 8),
         ]
         
         for agent in agents:
             cursor.execute('''
-                INSERT INTO agents (first_name, last_name, agency_name, email, phone, specialization, experience_years, photo_url)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO agents (first_name, last_name, agency_name, email, phone, specialization, experience_years)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
             ''', agent)
         
         # Propriétés d'exemple
@@ -854,5 +831,5 @@ if __name__ == "__main__":
     try:
         main()
     except Exception as e:
-        st.error(f"Erreur lors du démarrage de l'application : {e}")
-        st.info("Veuillez rafraîchir la page ou contacter le support.")
+        st.error("Une erreur s'est produite")
+        st.write("Détails:", str(e))
